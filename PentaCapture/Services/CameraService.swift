@@ -287,14 +287,7 @@ class CameraService: NSObject, ObservableObject {
             }
         }
     }
-    
-    var isVideoMirrored: Bool {
-        if let connection = videoDataOutput.connection(with: .video) {
-            return connection.isVideoMirrored
-        }
-        return false
-    }
-    
+
     // MARK: - Session Control
     func startSession() {
         guard isAuthorized else {
@@ -392,72 +385,6 @@ class CameraService: NSObject, ObservableObject {
         }
     }
     
-    // MARK: - Preview Layer
-    func getPreviewLayer() -> AVCaptureVideoPreviewLayer {
-        let previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
-        previewLayer.videoGravity = .resizeAspectFill
-        return previewLayer
-    }
-    
-    // MARK: - Focus Control
-    func setFocusPoint(_ point: CGPoint) {
-        guard let device = videoDeviceInput?.device else { return }
-        
-        do {
-            try device.lockForConfiguration()
-            
-            if device.isFocusPointOfInterestSupported && device.isFocusModeSupported(.autoFocus) {
-                device.focusPointOfInterest = point
-                device.focusMode = .autoFocus
-            }
-            
-            if device.isExposurePointOfInterestSupported && device.isExposureModeSupported(.autoExpose) {
-                device.exposurePointOfInterest = point
-                device.exposureMode = .autoExpose
-            }
-            
-            device.unlockForConfiguration()
-        } catch {
-            print("Error setting focus point: \(error)")
-        }
-    }
-    
-    // MARK: - Camera Switching
-    func switchCamera() {
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            
-            self.captureSession.beginConfiguration()
-            defer { self.captureSession.commitConfiguration() }
-            
-            guard let currentInput = self.videoDeviceInput else { return }
-            
-            self.captureSession.removeInput(currentInput)
-            
-            let newPosition: AVCaptureDevice.Position = currentInput.device.position == .back ? .front : .back
-            
-            guard let newDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: newPosition),
-                  let newInput = try? AVCaptureDeviceInput(device: newDevice),
-                  self.captureSession.canAddInput(newInput) else {
-                self.captureSession.addInput(currentInput)
-                return
-            }
-            
-            self.captureSession.addInput(newInput)
-            self.videoDeviceInput = newInput
-            
-            // Update video mirroring for front camera
-            if let connection = self.videoDataOutput.connection(with: .video),
-               connection.isVideoMirroringSupported {
-                connection.isVideoMirrored = (newPosition == .front)
-            }
-            
-            if let connection = self.photoOutput.connection(with: .video),
-               connection.isVideoMirroringSupported {
-                connection.isVideoMirrored = (newPosition == .front)
-            }
-        }
-    }
 }
 
 // MARK: - Photo Capture Delegate

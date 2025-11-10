@@ -103,23 +103,19 @@ class FaceTrackingService: NSObject, ObservableObject {
         currentHeadPose = nil
     }
     
-    // ARFaceAnchor'dan HeadPose çıkar
-    // With worldAlignment = .camera, faceAnchor.transform is already camera-relative
-    // No need for manual transform calculations
-    nonisolated private func extractHeadPose(from faceAnchor: ARFaceAnchor, cameraTransform: simd_float4x4? = nil) -> HeadPose {
-        // With .camera worldAlignment, face transform is already in camera space
-        // This gives us device-relative angles automatically
+    // Extract HeadPose from ARFaceAnchor
+    // With worldAlignment = .camera, transform is already camera-relative
+    nonisolated private func extractHeadPose(from faceAnchor: ARFaceAnchor) -> HeadPose {
         let eulerAngles = faceAnchor.transform.eulerAngles
 
-        // CORRECTED AXIS MAPPING for front camera + .camera alignment:
-        // - Turning head left/right (yaw) → eulerAngles.x
-        // - Tilting head up/down (pitch) → eulerAngles.y
-        // - Tilting head side-to-side (roll) → eulerAngles.z
-        // NOTE: Front camera is mirrored, so we negate yaw to match physical direction
+        // Axis mapping for front camera + .camera alignment:
+        // - yaw (left/right turn) → eulerAngles.x (negated for mirror)
+        // - pitch (up/down tilt) → eulerAngles.y
+        // - roll (side-to-side tilt) → eulerAngles.z
         return HeadPose(
-            yaw: -Double(eulerAngles.x),   // Turning left/right (negated for mirror)
-            pitch: Double(eulerAngles.y),  // Tilting up/down
-            roll: Double(eulerAngles.z),   // Tilting side-to-side
+            yaw: -Double(eulerAngles.x),
+            pitch: Double(eulerAngles.y),
+            roll: Double(eulerAngles.z),
             transform: faceAnchor.transform
         )
     }

@@ -32,14 +32,12 @@ class CaptureViewModel: ObservableObject {
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     private var validationStartTime: Date?
-    private var frameProcessingTask: Task<Void, Never>?
-    private var lastValidationLogTime = Date.distantPast
     private var validationLogCount = 0
     private var countdownTask: Task<Void, Never>?
 
     // Locked pose tracking for stricter countdown validation
     private var lockedPose: HeadPose?
-    private let countdownMovementTolerance = 8.0 // degrees - strict during countdown
+    private let countdownMovementTolerance = 8.0 // degrees
     
     // MARK: - Initialization
     init(
@@ -138,7 +136,6 @@ class CaptureViewModel: ObservableObject {
         print("🛑 Stopping capture...")
 
         // Cancel any ongoing operations
-        frameProcessingTask?.cancel()
         countdownTask?.cancel()
         countdownTask = nil
         isCountingDown = false
@@ -668,14 +665,6 @@ class CaptureViewModel: ObservableObject {
     }
     
     // MARK: - Manual Controls
-    func switchCamera() {
-        cameraService.switchCamera()
-    }
-    
-    func setFocus(at point: CGPoint) {
-        cameraService.setFocusPoint(point)
-    }
-    
     func skipToNextAngle() {
         guard let nextAngle = session.currentAngle.next else { return }
         session.currentAngle = nextAngle
@@ -704,11 +693,6 @@ class CaptureViewModel: ObservableObject {
     
     var canProceed: Bool {
         session.hasPhoto(for: session.currentAngle)
-    }
-    
-    // MARK: - Cleanup
-    nonisolated deinit {
-        frameProcessingTask?.cancel()
     }
 }
 
