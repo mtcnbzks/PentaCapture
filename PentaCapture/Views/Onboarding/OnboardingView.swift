@@ -29,7 +29,7 @@ struct OnboardingView: View {
       icon: "hand.raised.fill",
       title: "Otomatik Çekim",
       description:
-        "Telefonu doğru pozisyona getirdiğinizde fotoğraf otomatik olarak çekilir. Elle de çekebilirsiniz.",
+        "Telefonu doğru pozisyona getirdiğinizde fotoğraf otomatik olarak çekilir.",
       color: .green,
       needsCameraPermission: false
     ),
