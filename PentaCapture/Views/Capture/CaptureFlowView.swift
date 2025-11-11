@@ -12,6 +12,8 @@ struct CaptureFlowView: View {
     @StateObject var viewModel: CaptureViewModel
     @State private var showingReview = false
     @State private var showingInstructions = true
+    @State private var showingAngleTransition = false
+    @State private var lastCompletedAngle: CaptureAngle?
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -42,10 +44,19 @@ struct CaptureFlowView: View {
                 
                 Spacer()
                 
-                // Validation feedback
-                if let validation = viewModel.currentValidation {
-                    ValidationFeedbackView(validation: validation)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                // Validation feedback with Proximity Indicator
+                if let validation = viewModel.currentValidation, !viewModel.isCountingDown {
+                    VStack(spacing: 16) {
+                        // Large Proximity Indicator (Brief's key requirement)
+                        if validation.progress > 0.3 && !viewModel.showSuccess {
+                            ProximityIndicator(progress: validation.progress)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                        
+                        // Detailed validation feedback
+                        ValidationFeedbackView(validation: validation)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
                 
                 // Bottom controls
@@ -65,10 +76,25 @@ struct CaptureFlowView: View {
                     .transition(.scale.combined(with: .opacity))
             }
             
-            // Success overlay
+            // Enhanced Success overlay with confetti
             if viewModel.showSuccess {
-                CaptureSuccessView()
-                    .transition(.scale.combined(with: .opacity))
+                EnhancedSuccessView(
+                    angleTitle: viewModel.session.capturedPhotos.last?.angle.title ?? "",
+                    capturedCount: viewModel.session.capturedCount,
+                    totalCount: viewModel.session.totalCount
+                )
+                .transition(.scale.combined(with: .opacity))
+            }
+            
+            // Angle Transition overlay
+            if showingAngleTransition, let lastAngle = lastCompletedAngle {
+                AngleTransitionView(
+                    completedAngle: lastAngle,
+                    nextAngle: viewModel.session.currentAngle,
+                    capturedCount: viewModel.session.capturedCount,
+                    totalCount: viewModel.session.totalCount
+                )
+                .transition(.opacity)
             }
             
             // Debug overlay (top right)
@@ -137,6 +163,27 @@ struct CaptureFlowView: View {
                 // Pause capture before showing review
                 viewModel.pauseCapture()
                 showingReview = true
+            }
+        }
+        .onChange(of: viewModel.session.capturedCount) { newCount in
+            // Show angle transition when a photo is captured (except when session is complete)
+            if newCount > 0 && !viewModel.session.isComplete {
+                // Get the last captured angle
+                if let lastPhoto = viewModel.session.capturedPhotos.last {
+                    lastCompletedAngle = lastPhoto.angle
+                    
+                    // Show transition briefly
+                    withAnimation {
+                        showingAngleTransition = true
+                    }
+                    
+                    // Hide after 1.5 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        withAnimation {
+                            showingAngleTransition = false
+                        }
+                    }
+                }
             }
         }
         .alert("Hata", isPresented: .constant(viewModel.errorMessage != nil)) {

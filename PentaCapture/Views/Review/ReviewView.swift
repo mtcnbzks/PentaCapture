@@ -19,36 +19,57 @@ struct ReviewView: View {
     @State private var showingSaveConfirmation = false
     @State private var isSaving = false
     @State private var showingShareSheet = false
+    @State private var showProfessionalGrid = true // Toggle between layouts
+    @State private var showHeatMap = false
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
+                // Header with layout toggle
                 headerView
                 
-                // Grid of photos
-                ScrollView {
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 16) {
-                        ForEach(CaptureAngle.allCases) { angle in
-                            if let photo = session.photo(for: angle) {
-                                PhotoThumbnail(photo: photo, angle: angle) {
-                                    selectedPhoto = photo
-                                } onRetake: {
-                                    onRetake(angle)
-                                }
-                            } else {
-                                EmptyPhotoSlot(angle: angle) {
-                                    onRetake(angle)
+                // Main content area
+                if showProfessionalGrid {
+                    // Professional Timeline Grid
+                    ProfessionalReviewGrid(
+                        session: session,
+                        onPhotoTap: { photo in
+                            selectedPhoto = photo
+                        },
+                        onRetake: onRetake
+                    )
+                } else {
+                    // Original Grid Layout
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: 16) {
+                            ForEach(CaptureAngle.allCases) { angle in
+                                if let photo = session.photo(for: angle) {
+                                    PhotoThumbnail(photo: photo, angle: angle) {
+                                        selectedPhoto = photo
+                                    } onRetake: {
+                                        onRetake(angle)
+                                    }
+                                } else {
+                                    EmptyPhotoSlot(angle: angle) {
+                                        onRetake(angle)
+                                    }
                                 }
                             }
                         }
+                        .padding()
                     }
-                    .padding()
+                }
+                
+                // Heat Map (expandable)
+                if showHeatMap {
+                    ProgressHeatMap(angleStats: mockAngleStats)
+                        .padding()
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
                 // Action buttons
@@ -76,14 +97,45 @@ struct ReviewView: View {
     
     private var headerView: some View {
         VStack(spacing: 8) {
-            Text("Fotoğraflarınızı İnceleyin")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-            
-            Text("\(session.capturedCount)/\(session.totalCount) fotoğraf çekildi")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.8))
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Fotoğraflarınızı İnceleyin")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("\(session.capturedCount)/\(session.totalCount) fotoğraf çekildi")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                // Layout toggle buttons
+                HStack(spacing: 12) {
+                    // Grid layout toggle
+                    Button(action: {
+                        withAnimation {
+                            showProfessionalGrid.toggle()
+                        }
+                    }) {
+                        Image(systemName: showProfessionalGrid ? "square.grid.2x2.fill" : "square.grid.2x2")
+                            .font(.title3)
+                            .foregroundColor(.white.opacity(showProfessionalGrid ? 1.0 : 0.6))
+                    }
+                    
+                    // Heat map toggle
+                    Button(action: {
+                        withAnimation {
+                            showHeatMap.toggle()
+                        }
+                    }) {
+                        Image(systemName: showHeatMap ? "chart.bar.fill" : "chart.bar")
+                            .font(.title3)
+                            .foregroundColor(.white.opacity(showHeatMap ? 1.0 : 0.6))
+                    }
+                }
+            }
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -155,6 +207,19 @@ struct ReviewView: View {
                     // Show error
                 }
             }
+        }
+    }
+    
+    // Mock angle stats for heat map (TODO: implement real tracking)
+    private var mockAngleStats: [AngleStats] {
+        CaptureAngle.allCases.map { angle in
+            let hasPhoto = session.hasPhoto(for: angle)
+            return AngleStats(
+                angle: angle,
+                attempts: hasPhoto ? Int.random(in: 1...3) : 0,
+                timeSpent: hasPhoto ? Double.random(in: 3...15) : 0,
+                isCompleted: hasPhoto
+            )
         }
     }
 }
