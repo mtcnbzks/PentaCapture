@@ -105,121 +105,103 @@ struct StatusIndicatorView: View {
     }
 }
 
-/// Detailed validation metrics
+/// Minimal validation metrics
 struct ValidationMetricsView: View {
     let validation: PoseValidation
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Orientation metric (Phone pitch)
-            MetricRow(
-                icon: "rotate.3d",
-                label: "Telefon Açısı",
-                status: validation.orientationValidation.status,
-                detail: String(format: "%.0f°", validation.orientationValidation.currentPitch)
-            )
-            
-            // Yaw metric (Face direction) - PROMINENT and COMPACT
+        VStack(spacing: 6) {
+            // Yaw metric (Face direction) - Most important for user
             if let currentYaw = validation.orientationValidation.currentYaw,
                let targetYaw = validation.orientationValidation.targetYaw {
                 let yawError = abs(currentYaw - targetYaw)
                 let yawStatus = yawError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
                 
-                // Compact but highly visible yaw display
-                HStack(spacing: 16) {
-                    // Large current value with direction
-                    VStack(spacing: 2) {
-                        HStack(spacing: 4) {
-                            if currentYaw < 0 {
-                                Text("←")
-                                    .font(.system(size: 32, weight: .bold))
-                            }
-                            Text(String(format: "%.0f°", abs(currentYaw)))
-                                .font(.system(size: 48, weight: .heavy))
-                                .monospacedDigit()
-                                .animation(.easeInOut(duration: 0.2), value: Int(currentYaw))
-                            if currentYaw > 0 {
-                                Text("→")
-                                    .font(.system(size: 32, weight: .bold))
-                            }
+                HStack(spacing: 6) {
+                    // Direction arrow and value
+                    HStack(spacing: 3) {
+                        if currentYaw < -5 {
+                            Text("←")
+                                .font(.system(size: 14, weight: .bold))
+                        } else if currentYaw > 5 {
+                            Text("→")
+                                .font(.system(size: 14, weight: .bold))
                         }
-                        .foregroundColor(.white)
-                        
-                        Text("YÜZ YÖNÜ")
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(1)
-                            .foregroundColor(.white.opacity(0.7))
+                        Text(String(format: "%.0f°", abs(currentYaw)))
+                            .font(.system(size: 16, weight: .bold))
+                            .monospacedDigit()
                     }
+                    .foregroundColor(.white)
                     
-                    Divider()
-                        .background(Color.white.opacity(0.3))
-                        .frame(height: 60)
+                    Text("→")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.4))
                     
-                    // Target and status
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
-                            Text("Hedef:")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                            Text(String(format: "%.0f°", targetYaw))
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
-                                .monospacedDigit()
-                        }
-                        
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(yawStatusColor(yawStatus))
-                                .frame(width: 12, height: 12)
-                                .shadow(color: yawStatusColor(yawStatus).opacity(0.8), radius: 6)
-                            
-                            if yawError <= 25 {
-                                Text("TAMAM ✓")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(.green)
-                            } else {
-                                Text(String(format: "%.0f° daha", yawError))
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.orange)
-                                    .monospacedDigit()
-                            }
-                        }
-                    }
+                    Text(String(format: "%.0f°", targetYaw))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                        .monospacedDigit()
+                    
+                    Spacer()
+                    
+                    Circle()
+                        .fill(yawStatusColor(yawStatus))
+                        .frame(width: 6, height: 6)
                 }
-                .padding(12)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.black.opacity(0.85))
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.black.opacity(0.5))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(yawStatusColor(yawStatus), lineWidth: 3)
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(yawStatusColor(yawStatus), lineWidth: 1)
                         )
                 )
-                .shadow(color: .black.opacity(0.5), radius: 8)
             }
             
-            // Detection metric
-            if validation.detectionValidation.isDetected {
-                MetricRow(
-                    icon: "face.smiling",
-                    label: "Tespit",
-                    status: validation.detectionValidation.status,
-                    detail: String(format: "%.0f%%", validation.detectionValidation.size * 100)
-                )
+            // Compact status row - other metrics
+            HStack(spacing: 8) {
+                // Stability indicator
+                HStack(spacing: 3) {
+                    Image(systemName: "target")
+                        .font(.system(size: 9))
+                    Text(String(format: "%.1fs", validation.stabilityDuration))
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                }
+                
+                Spacer()
+                
+                // Face detection indicator
+                if validation.detectionValidation.isDetected {
+                    HStack(spacing: 3) {
+                        Image(systemName: "face.smiling")
+                            .font(.system(size: 9))
+                        Circle()
+                            .fill(statusColor(validation.detectionValidation.status))
+                            .frame(width: 6, height: 6)
+                    }
+                }
             }
-            
-            // Stability metric
-            MetricRow(
-                icon: "target",
-                label: "Stabilite",
-                status: validation.isStable ? .valid : .adjusting(progress: 0.5),
-                detail: String(format: "%.1fs", validation.stabilityDuration)
-            )
+            .foregroundColor(.white.opacity(0.7))
+            .font(.caption2)
+            .padding(.horizontal, 4)
         }
-        .font(.caption)
     }
     
     private func yawStatusColor(_ status: ValidationStatus) -> Color {
+        switch status {
+        case .invalid:
+            return .red
+        case .adjusting:
+            return .orange
+        case .valid, .locked:
+            return .green
+        }
+    }
+    
+    private func statusColor(_ status: ValidationStatus) -> Color {
         switch status {
         case .invalid:
             return .red

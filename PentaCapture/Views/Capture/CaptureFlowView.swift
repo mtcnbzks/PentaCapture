@@ -64,9 +64,12 @@ struct CaptureFlowView: View {
                     .padding(.bottom, 20)
                 }
                 
-                // Bottom controls
-                bottomControls
-                    .frame(maxWidth: .infinity)
+                // Bottom controls (hidden during countdown)
+                if !viewModel.isCountingDown {
+                    bottomControls
+                        .frame(maxWidth: .infinity)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             
             // Minimal center crosshair only (no big rectangle)
@@ -331,7 +334,7 @@ struct AngleInstructionView: View {
     }
 }
 
-/// Debug overlay to show tracking state and pose values
+/// Detailed debug overlay for demo - shows tracking state and pose values
 struct DebugOverlayView: View {
     let trackingState: String
     let isTracking: Bool
@@ -339,40 +342,76 @@ struct DebugOverlayView: View {
     
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
-            // Tracking status
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(isTracking ? Color.green : Color.red)
-                    .frame(width: 8, height: 8)
-                Text(trackingState)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+            // Tracking status with indicator
+            HStack(spacing: 6) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("ARKit Tracking")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(isTracking ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                            .shadow(color: isTracking ? .green : .red, radius: 4)
+                        Text(trackingState)
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(isTracking ? .green : .red)
+                    }
+                }
             }
-            .foregroundColor(.white)
             
-            // Pose values
+            // Pose values (detailed for demo)
             if let pose = headPose {
                 Divider()
-                    .background(Color.white.opacity(0.3))
+                    .background(Color.white.opacity(0.2))
                     .frame(height: 1)
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("Yaw: \(String(format: "%+.1f°", pose.yawDegrees))")
-                    Text("Pitch: \(String(format: "%+.1f°", pose.pitchDegrees))")
-                    Text("Roll: \(String(format: "%+.1f°", pose.rollDegrees))")
+                    Text("Head Pose")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    PoseValueRow(label: "Yaw", value: pose.yawDegrees, color: .cyan)
+                    PoseValueRow(label: "Pitch", value: pose.pitchDegrees, color: .orange)
+                    PoseValueRow(label: "Roll", value: pose.rollDegrees, color: .purple)
                 }
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.white)
             } else {
-                Text("No pose data")
-                    .font(.system(size: 11, design: .monospaced))
+                Text("No Face Detected")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundColor(.red)
             }
         }
-        .padding(12)
+        .padding(10)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.8))
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.75))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isTracking ? Color.green.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
+                )
         )
+        .shadow(color: .black.opacity(0.3), radius: 8)
+    }
+}
+
+/// Single pose value row for debug overlay
+struct PoseValueRow: View {
+    let label: String
+    let value: Double
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.6))
+                .frame(width: 35, alignment: .trailing)
+            
+            Text(String(format: "%+6.1f°", value))
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(color)
+                .frame(width: 60, alignment: .trailing)
+        }
     }
 }
 

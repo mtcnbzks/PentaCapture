@@ -62,35 +62,62 @@ struct CaptureDevicePose: Codable {
     }
 }
 
+/// Device and camera information for ML analysis
+struct DeviceInfo: Codable {
+    let deviceIdentifier: String      // e.g. "iPhone15,2"
+    let iosVersion: String            // e.g. "17.0"
+    let screenWidth: Double           // Screen width in points
+    let screenHeight: Double          // Screen height in points
+    let screenScale: Double           // Screen scale factor (2x, 3x)
+    let hasTrueDepth: Bool            // TrueDepth camera availability
+    let cameraPosition: String        // "front" or "back"
+    let appVersion: String            // App version
+    
+    enum CodingKeys: String, CodingKey {
+        case deviceIdentifier = "device_identifier"
+        case iosVersion = "ios_version"
+        case screenWidth = "screen_width"
+        case screenHeight = "screen_height"
+        case screenScale = "screen_scale"
+        case hasTrueDepth = "has_truedepth"
+        case cameraPosition = "camera_position"
+        case appVersion = "app_version"
+    }
+}
+
 /// Extended metadata for ML model training
 struct CaptureMetadata: Codable {
     let captureId: UUID
     let sessionId: UUID
-    let angle: CaptureAngle
-    let angleIndex: Int          // 0-4 (order in sequence)
+    let angle: CaptureAngle          // Internal use only (not exported to JSON)
+    let angleIndex: Int              // 0-4 (order in sequence)
     let timestamp: Date
     let validationScores: ValidationScores
     let devicePose: CaptureDevicePose
-    let imageWidth: Double       // Image width in pixels
-    let imageHeight: Double      // Image height in pixels
-    let attemptCount: Int        // How many attempts for this angle
-    let timeSpent: TimeInterval  // Time spent to capture this angle
+    let imageWidth: Double           // Image width in pixels
+    let imageHeight: Double          // Image height in pixels
+    let attemptCount: Int            // How many attempts for this angle
+    let timeSpent: TimeInterval      // Time spent to capture this angle
+    
+    // Internal only - used to collect device info for session export
+    var deviceInfo: DeviceInfo?
     
     enum CodingKeys: String, CodingKey {
         case captureId = "capture_id"
         case sessionId = "session_id"
-        case angle
+        // Note: 'angle' is intentionally omitted - not exported to JSON
         case angleIndex = "angle_index"
         case timestamp
         case validationScores = "validation_scores"
         case devicePose = "device_pose"
+        // Note: 'deviceInfo' is not exported here - it's at session level
         case imageWidth = "image_width"
         case imageHeight = "image_height"
         case attemptCount = "attempt_count"
         case timeSpent = "time_spent_seconds"
     }
     
-    init(captureId: UUID, sessionId: UUID, angle: CaptureAngle, angleIndex: Int, timestamp: Date, validationScores: ValidationScores, devicePose: CaptureDevicePose, imageSize: CGSize, attemptCount: Int, timeSpent: TimeInterval) {
+    init(captureId: UUID, sessionId: UUID, angle: CaptureAngle, angleIndex: Int, timestamp: Date, validationScores: ValidationScores, devicePose: CaptureDevicePose, imageSize: CGSize, attemptCount: Int, timeSpent: TimeInterval, deviceInfo: DeviceInfo? = nil) {
         self.captureId = captureId
         self.sessionId = sessionId
         self.angle = angle
@@ -102,6 +129,40 @@ struct CaptureMetadata: Codable {
         self.imageHeight = Double(imageSize.height)
         self.attemptCount = attemptCount
         self.timeSpent = timeSpent
+        self.deviceInfo = deviceInfo
+    }
+    
+    // Custom decoder - angle is derived from angleIndex
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        captureId = try container.decode(UUID.self, forKey: .captureId)
+        sessionId = try container.decode(UUID.self, forKey: .sessionId)
+        angleIndex = try container.decode(Int.self, forKey: .angleIndex)
+        angle = CaptureAngle(rawValue: angleIndex) ?? .frontFace
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        validationScores = try container.decode(ValidationScores.self, forKey: .validationScores)
+        devicePose = try container.decode(CaptureDevicePose.self, forKey: .devicePose)
+        imageWidth = try container.decode(Double.self, forKey: .imageWidth)
+        imageHeight = try container.decode(Double.self, forKey: .imageHeight)
+        attemptCount = try container.decode(Int.self, forKey: .attemptCount)
+        timeSpent = try container.decode(TimeInterval.self, forKey: .timeSpent)
+        deviceInfo = nil // Not decoded from individual photo metadata
+    }
+    
+    // Custom encoder - angle and deviceInfo are not exported to JSON
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(captureId, forKey: .captureId)
+        try container.encode(sessionId, forKey: .sessionId)
+        try container.encode(angleIndex, forKey: .angleIndex)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(validationScores, forKey: .validationScores)
+        try container.encode(devicePose, forKey: .devicePose)
+        try container.encode(imageWidth, forKey: .imageWidth)
+        try container.encode(imageHeight, forKey: .imageHeight)
+        try container.encode(attemptCount, forKey: .attemptCount)
+        try container.encode(timeSpent, forKey: .timeSpent)
+        // deviceInfo is NOT encoded here - it's at session level
     }
 }
 
@@ -361,6 +422,7 @@ class CaptureSession: ObservableObject {
 /// Session export structure for ML/Backend
 struct SessionExport: Codable {
     let sessionId: UUID
+    let deviceInfo: DeviceInfo       // Device info at session level (same for all photos)
     let startTime: Date
     let completionTime: Date
     let totalDuration: TimeInterval
@@ -372,6 +434,18 @@ struct SessionExport: Codable {
         self.startTime = startTime
         self.completionTime = completionTime
         self.totalDuration = completionTime.timeIntervalSince(startTime)
+        
+        // Extract device info from first photo (all photos have same device)
+        self.deviceInfo = photos.first?.metadata?.deviceInfo ?? DeviceInfo(
+            deviceIdentifier: "Unknown",
+            iosVersion: "Unknown",
+            screenWidth: 0,
+            screenHeight: 0,
+            screenScale: 1,
+            hasTrueDepth: false,
+            cameraPosition: "front",
+            appVersion: "1.0"
+        )
         
         // Extract metadata
         self.photosMetadata = photos.compactMap { $0.metadata }
@@ -394,6 +468,7 @@ struct SessionExport: Codable {
     
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
+        case deviceInfo = "device_info"
         case startTime = "start_time"
         case completionTime = "completion_time"
         case totalDuration = "total_duration_seconds"

@@ -811,8 +811,35 @@ class CaptureViewModel: ObservableObject {
         // Get attempt statistics
         let stats = session.angleStats[angle] ?? AngleCaptureStats(angle: angle)
         
+        // Collect device information
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let deviceIdentifier = withUnsafePointer(to: &systemInfo.machine) {
+            $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+                String(validatingUTF8: $0) ?? "Unknown"
+            }
+        }
+        
+        // Get screen information - use native bounds for accurate device screen dimensions
+        let screen = UIScreen.main
+        let nativeBounds = screen.nativeBounds
+        let nativeScale = screen.nativeScale
+        
+        let deviceInfo = DeviceInfo(
+            deviceIdentifier: deviceIdentifier,
+            iosVersion: UIDevice.current.systemVersion,
+            screenWidth: Double(nativeBounds.width / nativeScale),  // Physical points
+            screenHeight: Double(nativeBounds.height / nativeScale), // Physical points
+            screenScale: Double(nativeScale),
+            hasTrueDepth: faceTrackingService.isSupported,
+            cameraPosition: "front",
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        )
+        
         // Log the stats we're using for metadata
         print("📊 Creating metadata for \(angle.title):")
+        print("   Device: \(deviceInfo.deviceIdentifier)")
+        print("   Screen: \(String(format: "%.0fx%.0f", deviceInfo.screenWidth, deviceInfo.screenHeight)) pts @ \(String(format: "%.0f", deviceInfo.screenScale))x")
         print("   Attempts: \(stats.attempts)")
         print("   Time spent: \(String(format: "%.2f", stats.totalTimeSpent))s")
         
@@ -827,7 +854,8 @@ class CaptureViewModel: ObservableObject {
             devicePose: devicePose,
             imageSize: imageSize,
             attemptCount: stats.attempts,
-            timeSpent: stats.totalTimeSpent
+            timeSpent: stats.totalTimeSpent,
+            deviceInfo: deviceInfo  // Stored internally, exported at session level
         )
     }
 }
