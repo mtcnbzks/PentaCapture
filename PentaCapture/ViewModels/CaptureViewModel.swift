@@ -95,6 +95,9 @@ class CaptureViewModel: ObservableObject {
             storageService.requestAuthorization()
         }
         
+        // Start tracking time for first angle
+        session.startAngleCapture(for: session.currentAngle)
+        
         // Start services
         audioService.startProximityFeedback()
         
@@ -260,12 +263,29 @@ class CaptureViewModel: ObservableObject {
             yawError = nil
         }
         
-        // ARKit yüz tespit etti, detection valid
+        // Yüz merkez pozisyonu kontrolü
+        let centerOffset = headPose.centerOffset
+        let centerDistance = sqrt(centerOffset.x * centerOffset.x + centerOffset.y * centerOffset.y)
+        
+        // frontFace için yüz merkezde olmalı (maksimum 0.5 normalized birim uzaklık)
+        // Diğer açılar için daha toleranslı (maksimum 1.0)
+        let maxCenterDistance: CGFloat = currentAngle == .frontFace ? 0.5 : 1.0
+        let isCentered = centerDistance <= maxCenterDistance
+        
+        let detectionStatus: ValidationStatus
+        if !isCentered && currentAngle == .frontFace {
+            // frontFace için merkez kontrolü kritik
+            let centerProgress = max(0, 1.0 - Double(centerDistance / maxCenterDistance))
+            detectionStatus = centerProgress < 0.3 ? .invalid : .adjusting(progress: centerProgress)
+        } else {
+            detectionStatus = .valid
+        }
+        
         let detectionValidation = DetectionValidation(
-            status: .valid,
+            status: detectionStatus,
             boundingBox: nil,
             size: 1.0,
-            centerOffset: .zero,
+            centerOffset: centerOffset,
             isDetected: true
         )
         
@@ -549,18 +569,19 @@ class CaptureViewModel: ObservableObject {
                 angle: session.currentAngle,
                 image: image
             )
+            
+            // Record successful capture attempt with statistics
+            session.recordAttempt(for: session.currentAngle, successful: true)
 
             // Add to session
             session.addPhoto(photo)
             print("✅ Photo added to session. Total photos: \(session.capturedPhotos.count)/\(CaptureAngle.allCases.count)")
 
-            // Show success animation
+            // Brief success flash (very quick - for visual feedback only)
             showSuccess = true
-
-            // Wait briefly then move to next angle or complete
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-
+            try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds - just a quick flash
             showSuccess = false
+            
             isCapturing = false
 
             // Check if session is complete
@@ -595,6 +616,9 @@ class CaptureViewModel: ObservableObject {
     // MARK: - Session Management
     private func resetValidationState() {
         print("🔄 Resetting validation state for angle: \(session.currentAngle.title)")
+        
+        // Start tracking time for this angle
+        session.startAngleCapture(for: session.currentAngle)
         
         // Cancel any active countdown
         if isCountingDown {
@@ -644,14 +668,10 @@ class CaptureViewModel: ObservableObject {
         // Stop all services
         stopCapture()
         
-        // Optionally auto-save to gallery
-        // Uncomment if you want automatic saving
-        // try? await storageService.saveSessionToGallery(session)
+        // No need to save locally - session is kept in memory
+        // User will save to gallery from ReviewView if desired
         
-        // Save locally for review
-        storageService.saveSessionLocally(session)
-        
-        print("✅ Session saved locally for review")
+        print("✅ Session complete and ready for review")
     }
     
     // MARK: - Manual Controls

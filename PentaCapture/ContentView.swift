@@ -8,9 +8,10 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var showingOnboarding = true
+    @State private var showingOnboarding = false
     @State private var showingCapture = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("appOpenCount") private var appOpenCount = 0
     
     var body: some View {
         NavigationStack {
@@ -73,13 +74,13 @@ struct ContentView: View {
                             .cornerRadius(16)
                         }
                         
-                        // View tutorial button
+                        // View tutorial button (always available)
                         Button(action: {
                             showingOnboarding = true
                         }) {
                             HStack {
-                                Image(systemName: "info.circle")
-                                Text("Nasıl Kullanılır?")
+                                Image(systemName: hasCompletedOnboarding ? "info.circle" : "play.circle")
+                                Text(hasCompletedOnboarding ? "Nasıl Kullanılır?" : "Rehberi Göster")
                                     .fontWeight(.medium)
                             }
                             .frame(maxWidth: .infinity)
@@ -105,9 +106,18 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            if !hasCompletedOnboarding {
-                showingOnboarding = true
+            // Track app opens
+            appOpenCount += 1
+            
+            // Smart onboarding logic
+            if !hasCompletedOnboarding && appOpenCount <= 1 {
+                // First time user - show onboarding automatically
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showingOnboarding = true
+                }
             }
+            // Returning users (hasCompletedOnboarding == true) don't see onboarding
+            // They can manually open it via "Nasıl Kullanılır?" button
         }
     }
 }

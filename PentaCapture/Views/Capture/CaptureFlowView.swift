@@ -13,7 +13,6 @@ struct CaptureFlowView: View {
     @State private var showingReview = false
     @State private var showingInstructions = true
     @State private var showingAngleTransition = false
-    @State private var lastCompletedAngle: CaptureAngle?
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -30,9 +29,10 @@ struct CaptureFlowView: View {
             }
             
             // Overlay UI
-            VStack {
+            VStack(spacing: 0) {
                 // Top bar
                 topBar
+                    .padding(.top, 8)
                 
                 Spacer()
                 
@@ -57,18 +57,20 @@ struct CaptureFlowView: View {
                         ValidationFeedbackView(validation: validation)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
                 
                 // Bottom controls
                 bottomControls
             }
             
-            // Pose guide overlay
-            CompletePoseGuide(
-                angle: viewModel.session.currentAngle,
-                validation: viewModel.currentValidation
-            )
-            .allowsHitTesting(false)
+            // Minimal center crosshair only (no big rectangle)
+            if !viewModel.isCountingDown && !viewModel.showSuccess {
+                CenterCrosshairView()
+                    .allowsHitTesting(false)
+            }
             
             // Countdown overlay
             if viewModel.isCountingDown {
@@ -76,25 +78,16 @@ struct CaptureFlowView: View {
                     .transition(.scale.combined(with: .opacity))
             }
             
-            // Enhanced Success overlay with confetti
+            // Quick success flash (minimal - for speed)
             if viewModel.showSuccess {
-                EnhancedSuccessView(
-                    angleTitle: viewModel.session.capturedPhotos.last?.angle.title ?? "",
-                    capturedCount: viewModel.session.capturedCount,
-                    totalCount: viewModel.session.totalCount
-                )
-                .transition(.scale.combined(with: .opacity))
+                CompactSuccessView()
+                    .transition(.scale.combined(with: .opacity))
             }
             
-            // Angle Transition overlay
-            if showingAngleTransition, let lastAngle = lastCompletedAngle {
-                AngleTransitionView(
-                    completedAngle: lastAngle,
-                    nextAngle: viewModel.session.currentAngle,
-                    capturedCount: viewModel.session.capturedCount,
-                    totalCount: viewModel.session.totalCount
-                )
-                .transition(.opacity)
+            // Quick angle indicator (minimal - for speed)
+            if showingAngleTransition {
+                QuickAngleTransition(nextAngle: viewModel.session.currentAngle)
+                    .transition(.opacity)
             }
             
             // Debug overlay (top right)
@@ -157,31 +150,35 @@ struct CaptureFlowView: View {
                 },
                 onSaveToGallery: {}
             )
+            .onAppear {
+                // Ensure camera is fully stopped when review appears
+                print("📱 Review opened - stopping all camera services")
+                viewModel.stopCapture()
+            }
         }
         .onChange(of: viewModel.session.isComplete) { isComplete in
             if isComplete {
                 // Pause capture before showing review
                 viewModel.pauseCapture()
-                showingReview = true
+                
+                // Small delay for smooth transition to review
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showingReview = true
+                }
             }
         }
         .onChange(of: viewModel.session.capturedCount) { newCount in
-            // Show angle transition when a photo is captured (except when session is complete)
+            // Show quick angle indicator when a photo is captured (except when session is complete)
             if newCount > 0 && !viewModel.session.isComplete {
-                // Get the last captured angle
-                if let lastPhoto = viewModel.session.capturedPhotos.last {
-                    lastCompletedAngle = lastPhoto.angle
-                    
-                    // Show transition briefly
+                // Show transition briefly
+                withAnimation {
+                    showingAngleTransition = true
+                }
+                
+                // Hide after 1.2 seconds - give user time to read next angle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                     withAnimation {
-                        showingAngleTransition = true
-                    }
-                    
-                    // Hide after 1.5 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        withAnimation {
-                            showingAngleTransition = false
-                        }
+                        showingAngleTransition = false
                     }
                 }
             }
@@ -284,8 +281,8 @@ struct CaptureFlowView: View {
                 }
             }
         }
-        .padding(.horizontal, 30)
-        .padding(.bottom, 30)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 10)
     }
 }
 
@@ -319,13 +316,14 @@ struct AngleInstructionView: View {
                 .foregroundColor(.yellow.opacity(0.9))
                 .padding(.top, 4)
         }
-        .padding()
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.7))
-                .blur(radius: 10)
+                .fill(Color.black.opacity(0.75))
         )
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

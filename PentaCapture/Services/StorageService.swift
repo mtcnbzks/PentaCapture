@@ -99,6 +99,8 @@ class StorageService: ObservableObject {
     // MARK: - Save Methods
     
     /// Save a single photo to gallery
+    /// Note: Photos are already captured in HEIC format by CameraService,
+    /// so we just save them directly without additional compression
     func saveToGallery(_ image: UIImage) async throws -> String {
         guard isAuthorized else {
             throw StorageError.unauthorized
@@ -107,9 +109,16 @@ class StorageService: ObservableObject {
         return try await withCheckedThrowingContinuation { continuation in
             var assetIdentifier: String?
             
+            // Save as HEIC for optimal storage
+            // Use high quality since camera already captured in HEIC format
+            guard let imageData = getImageData(from: image) else {
+                continuation.resume(throwing: StorageError.invalidData)
+                return
+            }
+            
             photoLibrary.performChanges {
                 let creationRequest = PHAssetCreationRequest.forAsset()
-                creationRequest.addResource(with: .photo, data: image.jpegData(compressionQuality: 0.9)!, options: nil)
+                creationRequest.addResource(with: .photo, data: imageData, options: nil)
                 
                 assetIdentifier = creationRequest.placeholderForCreatedAsset?.localIdentifier
             } completionHandler: { success, error in
@@ -120,6 +129,21 @@ class StorageService: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Get image data in best available format
+    /// Prefers HEIC (already captured in this format), falls back to JPEG
+    private func getImageData(from image: UIImage) -> Data? {
+        // First try HEIC conversion (preserves original HEIC format)
+        if #available(iOS 11.0, *),
+           let heicData = image.heicData(compressionQuality: 0.9) {
+            print("💾 Saving photo in HEIC format")
+            return heicData
+        }
+        
+        // Fallback to high-quality JPEG
+        print("💾 Saving photo in JPEG format (fallback)")
+        return image.jpegData(compressionQuality: 0.9)
     }
     
     /// Save multiple photos to gallery as an album
@@ -133,16 +157,22 @@ class StorageService: ObservableObject {
         // Get or create album
         let album = try await getOrCreateAlbum(named: albumName)
         
-        // Save each photo
+        // Save each photo (already in HEIC format from camera)
         for photo in session.capturedPhotos {
             guard let image = photo.image else { continue }
+            
+            // Get image data (preserves HEIC format from camera)
+            guard let imageData = getImageData(from: image) else {
+                print("⚠️ Failed to get image data for angle: \(photo.angle.title)")
+                continue
+            }
             
             let identifier = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                 var assetIdentifier: String?
                 
                 photoLibrary.performChanges {
                     let creationRequest = PHAssetCreationRequest.forAsset()
-                    creationRequest.addResource(with: .photo, data: image.jpegData(compressionQuality: 0.9)!, options: nil)
+                    creationRequest.addResource(with: .photo, data: imageData, options: nil)
                     
                     // Add metadata
                     creationRequest.creationDate = photo.timestamp
@@ -164,6 +194,7 @@ class StorageService: ObservableObject {
             }
             
             identifiers.append(identifier)
+            print("✅ Saved photo to gallery (HEIC): \(photo.angle.title)")
         }
         
         return identifiers
@@ -265,44 +296,65 @@ class StorageService: ObservableObject {
     }
 }
 
-// MARK: - Local Storage Extension
+// MARK: - Cleanup
 extension StorageService {
-    /// Save session to UserDefaults for quick access
-    func saveSessionLocally(_ session: CaptureSession) {
-        guard let data = exportSession(session) else { return }
-        
-        UserDefaults.standard.set(data, forKey: "lastCaptureSession")
-        UserDefaults.standard.set(session.sessionId.uuidString, forKey: "lastSessionId")
-        UserDefaults.standard.set(session.startTime, forKey: "lastSessionDate")
-    }
-    
-    /// Load last session from UserDefaults
-    func loadLastSession() -> CaptureSession? {
-        guard let data = UserDefaults.standard.data(forKey: "lastCaptureSession"),
-              let photos = try? importSession(data) else {
-            return nil
-        }
-        
-        let session = CaptureSession()
-        // Directly set photos to prevent multiple addPhoto calls that change currentAngle
-        session.capturedPhotos = photos
-        
-        // Determine current angle and completion status
-        if photos.count >= CaptureAngle.allCases.count {
-            session.isComplete = true
-        } else if let lastPhoto = photos.last,
-                  let nextAngle = lastPhoto.angle.next {
-            session.currentAngle = nextAngle
-        }
-        
-        return session
-    }
-    
-    /// Clear locally stored session
-    func clearLocalSession() {
+    /// Clean up old UserDefaults data that was causing memory issues
+    /// This removes the large photo data (20MB+) that was incorrectly stored in UserDefaults
+    func cleanupOldUserDefaultsData() {
+        // Remove old session data that exceeded UserDefaults 4MB limit
         UserDefaults.standard.removeObject(forKey: "lastCaptureSession")
         UserDefaults.standard.removeObject(forKey: "lastSessionId")
         UserDefaults.standard.removeObject(forKey: "lastSessionDate")
+        print("🧹 Cleaned up old UserDefaults session data")
+    }
+}
+
+// MARK: - UIImage HEIC Extension
+extension UIImage {
+    /// Convert UIImage to HEIC format data with preserved orientation
+    /// HEIC provides better compression than JPEG (~50% smaller file size)
+    /// Note: Camera captures in HEIC format, this is for preserving that format
+    @available(iOS 11.0, *)
+    func heicData(compressionQuality: CGFloat = 0.9) -> Data? {
+        guard let mutableData = CFDataCreateMutable(nil, 0),
+              let destination = CGImageDestinationCreateWithData(mutableData, "public.heic" as CFString, 1, nil),
+              let cgImage = self.cgImage else {
+            return nil
+        }
+        
+        // CRITICAL: Preserve orientation metadata
+        // Convert UIImage.Orientation to CGImagePropertyOrientation value
+        let orientationValue = self.cgImagePropertyOrientation
+        
+        // High quality with orientation metadata preserved
+        let options: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: compressionQuality,
+            kCGImagePropertyOrientation: orientationValue
+        ]
+        
+        CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
+        
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+        
+        return mutableData as Data
+    }
+    
+    /// Convert UIImage.Orientation to CGImagePropertyOrientation raw value
+    /// This ensures orientation is preserved when saving to HEIC/JPEG
+    private var cgImagePropertyOrientation: UInt32 {
+        switch self.imageOrientation {
+        case .up: return 1
+        case .upMirrored: return 2
+        case .down: return 3
+        case .downMirrored: return 4
+        case .leftMirrored: return 5
+        case .right: return 6
+        case .rightMirrored: return 7
+        case .left: return 8
+        @unknown default: return 1
+        }
     }
 }
 

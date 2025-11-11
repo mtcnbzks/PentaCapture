@@ -71,10 +71,19 @@ struct DetectionValidation {
         guard isDetected else { return "Yüz tespit edilemedi" }
         
         switch status {
-        case .invalid: return "Pozisyonu ayarlayın"
-        case .adjusting: return "Devam edin..."
-        case .valid: return "Pozisyon iyi"
-        case .locked: return "Kilitlendi!"
+        case .invalid:
+            // Yönlendirme mesajı (merkeze yaklaştır)
+            if abs(centerOffset.x) > abs(centerOffset.y) {
+                return centerOffset.x > 0 ? "Yüzünüzü daha sola alın" : "Yüzünüzü daha sağa alın"
+            } else {
+                return centerOffset.y > 0 ? "Yüzünüzü daha aşağı alın" : "Yüzünüzü daha yukarı alın"
+            }
+        case .adjusting: 
+            return "Yüzünüzü merkeze getirin..."
+        case .valid: 
+            return "Pozisyon iyi"
+        case .locked: 
+            return "Kilitlendi!"
         }
     }
 }

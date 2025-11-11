@@ -76,8 +76,8 @@ enum CaptureAngle: Int, CaseIterable, Identifiable {
     // Yaw toleransı (derece)
     var yawTolerance: Double {
         switch self {
+        case .frontFace: return 15.0  // Front view strict - face must be centered
         case .rightProfile, .leftProfile: return 15.0  // Profile views need precision
-        case .frontFace: return 20.0  // Front view reasonably strict
         default: return 45.0  // Other views more flexible
         }
     }

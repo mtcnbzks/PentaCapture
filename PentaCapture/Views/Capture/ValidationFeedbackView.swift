@@ -29,12 +29,12 @@ struct ValidationFeedbackView: View {
                 ValidationMetricsView(validation: validation)
             }
         }
-        .padding()
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.6))
-                .blur(radius: 10)
+                .fill(Color.black.opacity(0.7))
         )
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

@@ -67,7 +67,7 @@ struct ReviewView: View {
                 
                 // Heat Map (expandable)
                 if showHeatMap {
-                    ProgressHeatMap(angleStats: mockAngleStats)
+                    ProgressHeatMap(angleStats: session.getAngleStatsArray())
                         .padding()
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -87,8 +87,8 @@ struct ReviewView: View {
             }
         }
         .alert("Fotoğraflar Kaydedildi", isPresented: $showingSaveConfirmation) {
-            Button("Tamam") {
-                onComplete()
+            Button("Tamam", role: .cancel) {
+                // Just dismiss alert, don't close ReviewView
             }
         } message: {
             Text("\(session.capturedCount) fotoğraf başarıyla galerinize kaydedildi.")
@@ -207,19 +207,6 @@ struct ReviewView: View {
                     // Show error
                 }
             }
-        }
-    }
-    
-    // Mock angle stats for heat map (TODO: implement real tracking)
-    private var mockAngleStats: [AngleStats] {
-        CaptureAngle.allCases.map { angle in
-            let hasPhoto = session.hasPhoto(for: angle)
-            return AngleStats(
-                angle: angle,
-                attempts: hasPhoto ? Int.random(in: 1...3) : 0,
-                timeSpent: hasPhoto ? Double.random(in: 3...15) : 0,
-                isCompleted: hasPhoto
-            )
         }
     }
 }

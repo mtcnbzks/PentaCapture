@@ -179,30 +179,58 @@ struct QuickAngleTransition: View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.8)
+            Color.black.opacity(0.85)
                 .ignoresSafeArea()
             
-            VStack(spacing: 16) {
-                Image(systemName: nextAngle.symbolName)
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-                    .scaleEffect(scale)
+            VStack(spacing: 24) {
+                // "Sıradaki" başlığı
+                Text("SIRADAKI")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.blue.opacity(0.8))
+                    .tracking(3)
                 
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .frame(width: 120, height: 120)
+                    
+                    Image(systemName: nextAngle.symbolName)
+                        .font(.system(size: 60))
+                        .foregroundColor(.blue)
+                        .scaleEffect(scale)
+                }
+                
+                // Angle title
                 Text(nextAngle.title)
-                    .font(.title3)
+                    .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                 
+                // Instructions
                 Text(nextAngle.instructions)
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
+                    .lineSpacing(4)
+                
+                // Ready indicator
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .foregroundColor(.blue)
+                    Text("Hazır olduğunuzda devam edin")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .padding(.top, 8)
             }
+            .padding(40)
             .opacity(opacity)
         }
         .onAppear {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 scale = 1.0
                 opacity = 1.0
             }

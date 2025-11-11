@@ -54,43 +54,7 @@ struct ProgressHeatMap: View {
     }
 }
 
-/// Individual angle statistics
-struct AngleStats: Identifiable {
-    let id = UUID()
-    let angle: CaptureAngle
-    var attempts: Int = 0
-    var timeSpent: TimeInterval = 0
-    var isCompleted: Bool = false
-    
-    var difficulty: Difficulty {
-        if !isCompleted { return .pending }
-        if timeSpent < 5 { return .easy }
-        if timeSpent < 15 { return .medium }
-        return .hard
-    }
-    
-    enum Difficulty {
-        case pending, easy, medium, hard
-        
-        var color: Color {
-            switch self {
-            case .pending: return .gray
-            case .easy: return .green
-            case .medium: return .yellow
-            case .hard: return .red
-            }
-        }
-        
-        var label: String {
-            switch self {
-            case .pending: return "Bekliyor"
-            case .easy: return "Kolay"
-            case .medium: return "Orta"
-            case .hard: return "Zor"
-            }
-        }
-    }
-}
+// Note: AngleStats is now defined in CaptureSession.swift and shared across the app
 
 /// Single row for angle stat
 struct AngleStatRow: View {

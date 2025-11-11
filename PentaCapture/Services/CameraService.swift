@@ -218,13 +218,22 @@ class CameraService: NSObject, ObservableObject {
         
         captureSession.addOutput(photoOutput)
         
-        // Configure photo output
+        // Configure photo output for HEIC/HEVC capture
         photoOutput.isHighResolutionCaptureEnabled = true
+        
+        // Enable max quality for better HEIC results (iOS 13+)
+        if #available(iOS 13.0, *) {
+            photoOutput.maxPhotoQualityPrioritization = .quality
+        }
+        
+        // Video stabilization
         if let connection = photoOutput.connection(with: .video) {
             if connection.isVideoStabilizationSupported {
                 connection.preferredVideoStabilizationMode = .auto
             }
         }
+        
+        print("📸 Available photo codecs: \(photoOutput.availablePhotoCodecTypes.map { $0.rawValue })")
         
         // Setup video data output for frame processing
         guard captureSession.canAddOutput(videoDataOutput) else {
@@ -353,24 +362,36 @@ class CameraService: NSObject, ObservableObject {
         print("📸 CameraService: Setting up photo capture...")
         
         return try await withCheckedThrowingContinuation { continuation in
-            var settings = AVCapturePhotoSettings()
+            // Configure photo settings for HEIC/HEVC capture
+            let settings: AVCapturePhotoSettings
             
-            // Configure photo settings
-            settings.flashMode = .off
-            
-            // High quality capture
-            settings.isHighResolutionPhotoEnabled = true
-            
-            // Set preferred codec if available (HEVC for better compression)
-            if #available(iOS 11.0, *) {
-                if photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-                    settings.flashMode = .off
-                    settings.isHighResolutionPhotoEnabled = true
-                }
+            // Directly capture in HEIC format (iOS 11+) for best quality and compression
+            if #available(iOS 11.0, *),
+               photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+                // Use HEVC codec for HEIC format (50% smaller than JPEG, better quality)
+                settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+                print("📸 Using HEIC/HEVC format for capture")
+            } else {
+                // Fallback to default format for older devices
+                settings = AVCapturePhotoSettings()
+                print("⚠️ HEVC not available, using default format")
             }
             
-            print("📸 CameraService: Creating photo capture delegate...")
+            // Configure settings
+            settings.flashMode = .off
+            settings.isHighResolutionPhotoEnabled = true
+            
+            // Maximum quality prioritization (iOS 13+)
+            if #available(iOS 13.0, *) {
+                settings.photoQualityPrioritization = .quality
+            }
+            
+            // Auto still image stabilization
+            if #available(iOS 13.0, *) {
+                settings.isAutoStillImageStabilizationEnabled = true
+            }
+            
+            print("📸 CameraService: Creating photo capture delegate with settings: flash=\(settings.flashMode.rawValue), highRes=\(settings.isHighResolutionPhotoEnabled)")
             
             // CRITICAL: Store delegate as instance variable to prevent garbage collection
             self.photoCaptureDelegate = PhotoCaptureDelegate { [weak self] result in
@@ -405,22 +426,53 @@ private class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
             return
         }
         
-        guard let imageData = photo.fileDataRepresentation() else {
-            print("❌ PhotoCaptureDelegate: Failed to get image data")
+        // CRITICAL: Use CGImageRepresentation to preserve orientation metadata
+        // Per Apple docs: cgImageRepresentation() returns CGImage? directly
+        // Front camera photos need proper orientation handling
+        guard let cgImage = photo.cgImageRepresentation() else {
+            print("❌ PhotoCaptureDelegate: Failed to get CGImage")
             completion(.failure(CameraError.captureFailed))
             return
         }
         
-        print("📸 PhotoCaptureDelegate: Got image data, size: \(imageData.count) bytes")
+        // Get the correct orientation from photo metadata
+        // Front camera is mirrored and may have different orientation
+        let imageOrientation = self.getImageOrientation(from: photo)
         
-        guard let image = UIImage(data: imageData) else {
-            print("❌ PhotoCaptureDelegate: Failed to create UIImage from data")
-            completion(.failure(CameraError.captureFailed))
-            return
-        }
+        // Create UIImage with correct orientation
+        let image = UIImage(cgImage: cgImage, 
+                          scale: 1.0, 
+                          orientation: imageOrientation)
         
-        print("✅ PhotoCaptureDelegate: Successfully created UIImage, size: \(image.size)")
+        print("✅ PhotoCaptureDelegate: Created UIImage with orientation: \(imageOrientation.rawValue), size: \(image.size)")
         completion(.success(image))
+    }
+    
+    // Convert AVCapturePhoto metadata orientation to UIImage orientation
+    private func getImageOrientation(from photo: AVCapturePhoto) -> UIImage.Orientation {
+        // Get orientation from photo metadata
+        // For front camera in portrait mode, we typically need .leftMirrored
+        guard let metadata = photo.metadata[String(kCGImagePropertyOrientation)] as? UInt32 else {
+            // Default for front camera portrait: leftMirrored
+            print("⚠️ No orientation metadata, using default .leftMirrored")
+            return .leftMirrored
+        }
+        
+        // Convert CGImagePropertyOrientation to UIImage.Orientation
+        // Reference: https://developer.apple.com/documentation/imageio/cgimagepropertyorientation
+        switch metadata {
+        case 1: return .up
+        case 2: return .upMirrored
+        case 3: return .down
+        case 4: return .downMirrored
+        case 5: return .leftMirrored
+        case 6: return .right
+        case 7: return .rightMirrored
+        case 8: return .left
+        default:
+            print("⚠️ Unknown orientation value: \(metadata), using .leftMirrored")
+            return .leftMirrored
+        }
     }
 }
 

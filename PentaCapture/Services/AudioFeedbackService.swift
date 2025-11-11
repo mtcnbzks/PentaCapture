@@ -136,9 +136,12 @@ class AudioFeedbackService: ObservableObject {
             lightHaptic.prepare()
             
         case .captured:
-            playSystemSound(.captured)
+            // AVCapturePhotoOutput automatically plays shutter sound
+            // We only add haptic feedback here to avoid double sound
+            // Note: Shutter sound cannot be disabled in Japan due to legal requirements
             notificationHaptic.notificationOccurred(.success)
             notificationHaptic.prepare()
+            print("📸 Photo captured - haptic feedback only (AVCapturePhotoOutput handles sound)")
             
         case .error:
             playSystemSound(.error)
@@ -253,6 +256,7 @@ class AudioFeedbackService: ObservableObject {
     // MARK: - System Sounds
     private func playSystemSound(_ sound: FeedbackSound) {
         guard let soundID = sound.systemSoundID else { return }
+        // All sounds respect silent mode (shutter sound is handled by AVCapturePhotoOutput)
         AudioServicesPlaySystemSound(soundID)
     }
     

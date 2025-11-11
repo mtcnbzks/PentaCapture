@@ -18,6 +18,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct PentaCaptureApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    init() {
+        // Clean up old UserDefaults data that was exceeding 4MB limit
+        StorageService().cleanupOldUserDefaultsData()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

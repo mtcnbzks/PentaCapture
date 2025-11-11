@@ -15,11 +15,22 @@ struct HeadPose {
     let pitch: Double    // Yüz eğimi (yukarı/aşağı) - radyan
     let roll: Double     // Yüz yatışı (yan eğim) - radyan
     let transform: simd_float4x4  // Tam transform matrisi
+    let position: simd_float3     // 3D pozisyon (x, y, z) - kamera koordinatlarında
     
     // Derece cinsinden değerler
     var yawDegrees: Double { yaw * 180.0 / .pi }
     var pitchDegrees: Double { pitch * 180.0 / .pi }
     var rollDegrees: Double { roll * 180.0 / .pi }
+    
+    // Yüzün merkeze olan uzaklığı (normalized, 0.0 = merkez)
+    // x: yatay offset (-left, +right), y: dikey offset (-down, +up)
+    var centerOffset: CGPoint {
+        // ARKit position: x = right, y = up, z = forward (camera space)
+        // Normalize edilmiş değerler (kabaca 0.3 metre = tam ekran)
+        let normalizedX = CGFloat(position.x / 0.15) // ±0.15m ≈ tam ekran genişliği
+        let normalizedY = CGFloat(position.y / 0.2)  // ±0.2m ≈ tam ekran yüksekliği
+        return CGPoint(x: normalizedX, y: normalizedY)
+    }
 }
 
 /// Face tracking hataları
@@ -107,6 +118,13 @@ class FaceTrackingService: NSObject, ObservableObject {
     // With worldAlignment = .camera, transform is already camera-relative
     nonisolated private func extractHeadPose(from faceAnchor: ARFaceAnchor) -> HeadPose {
         let eulerAngles = faceAnchor.transform.eulerAngles
+        
+        // Extract 3D position from transform matrix (column 3 = translation)
+        let position = simd_float3(
+            faceAnchor.transform.columns.3.x,
+            faceAnchor.transform.columns.3.y,
+            faceAnchor.transform.columns.3.z
+        )
 
         // Axis mapping for front camera + .camera alignment:
         // - yaw (left/right turn) → eulerAngles.x (negated for mirror)
@@ -116,7 +134,8 @@ class FaceTrackingService: NSObject, ObservableObject {
             yaw: -Double(eulerAngles.x),
             pitch: Double(eulerAngles.y),
             roll: Double(eulerAngles.z),
-            transform: faceAnchor.transform
+            transform: faceAnchor.transform,
+            position: position
         )
     }
 }
