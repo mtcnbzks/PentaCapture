@@ -127,8 +127,6 @@ struct ValidationMetricsView: View {
           .foregroundColor(.white.opacity(0.4))
           .monospacedDigit()
 
-        Spacer()
-
         // Minimal status indicators stacked
         VStack(spacing: 4) {
           // Status indicator
@@ -155,6 +153,8 @@ struct ValidationMetricsView: View {
         Capsule()
           .fill(Color.black.opacity(0.5))
       )
+      .fixedSize(horizontal: true, vertical: false)
+      .frame(maxWidth: .infinity, alignment: .center)
     }
   }
 

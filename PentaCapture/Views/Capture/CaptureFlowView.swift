@@ -311,35 +311,31 @@ struct AngleInstructionView: View {
   let angle: CaptureAngle
 
   var body: some View {
-    VStack(spacing: 12) {
+    HStack(spacing: 12) {
       // Icon
       Image(systemName: angle.symbolName)
-        .font(.system(size: 40))
+        .font(.system(size: 24))
         .foregroundColor(.white)
 
-      // Title
-      Text(angle.title)
-        .font(.title3)
-        .fontWeight(.bold)
-        .foregroundColor(.white)
+      VStack(alignment: .leading, spacing: 4) {
+        // Title
+        Text(angle.title)
+          .font(.headline)
+          .fontWeight(.semibold)
+          .foregroundColor(.white)
 
-      // Instructions
-      Text(angle.instructions)
-        .font(.subheadline)
-        .foregroundColor(.white.opacity(0.9))
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, 40)
-
-      // Auto capture hint
-      Text("Doğru pozisyonda durun, otomatik çekim başlayacak")
-        .font(.caption)
-        .foregroundColor(.yellow.opacity(0.9))
-        .padding(.top, 4)
+        // Instructions (compact)
+        Text(angle.instructions)
+          .font(.caption)
+          .foregroundColor(.white.opacity(0.8))
+          .lineLimit(2)
+      }
     }
-    .padding(16)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
     .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(Color.black.opacity(0.75))
+      Capsule()
+        .fill(Color.black.opacity(0.6))
     )
     .padding(.horizontal, 20)
     .padding(.top, 20)
