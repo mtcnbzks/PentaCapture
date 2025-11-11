@@ -9,23 +9,25 @@ import SwiftUI
 
 // AppDelegate - portrait only
 class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        return .portrait
-    }
+  func application(
+    _ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?
+  ) -> UIInterfaceOrientationMask {
+    return .portrait
+  }
 }
 
 @main
 struct PentaCaptureApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
-    init() {
-        // Clean up old UserDefaults data that was exceeding 4MB limit
-        StorageService().cleanupOldUserDefaultsData()
+  @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+  init() {
+    // Clean up old UserDefaults data that was exceeding 4MB limit
+    StorageService().cleanupOldUserDefaultsData()
+  }
+
+  var body: some Scene {
+    WindowGroup {
+      ContentView()
     }
-    
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
+  }
 }
