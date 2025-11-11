@@ -401,12 +401,7 @@ class CaptureViewModel: ObservableObject {
                 // Play audio for all countdown numbers
                 self.audioService.playFeedback(.countdown(number: count))
 
-                // Haptic feedback at count = 1 (1 second before capture)
-                if count == 1 {
-                    print("🔔 1 second warning - haptic feedback")
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.warning)
-                }
+                // No extra haptic here - countdown already provides haptic feedback
 
                 // Sleep in smaller increments to check cancellation more frequently
                 for _ in 0..<10 {
@@ -536,11 +531,6 @@ class CaptureViewModel: ObservableObject {
             print("📸 Calling cameraService.capturePhoto()...")
             let image = try await cameraService.capturePhoto()
             print("✅ Photo captured successfully! Image size: \(image.size)")
-
-            // Haptic feedback when photo is captured
-            print("📳 Photo captured - haptic feedback")
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
 
             // If we paused ARKit, stop camera and resume ARKit
             if wasUsingARKit {

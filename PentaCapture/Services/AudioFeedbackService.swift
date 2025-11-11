@@ -35,7 +35,7 @@ enum FeedbackSound {
 class AudioFeedbackService: ObservableObject {
     // MARK: - Published Properties
     @Published var isEnabled = true
-    @Published var volume: Float = 1.0
+    @Published var volume: Float = 0.7 // Reduced default volume
     
     // MARK: - Private Properties
     private var audioEngine: AVAudioEngine?
@@ -44,14 +44,29 @@ class AudioFeedbackService: ObservableObject {
     
     private var lastProximityProgress: Double = 0.0
     private var proximityTimer: Timer?
+    private var lastHapticTime: Date = .distantPast
     
     // Audio session
     private let audioSession = AVAudioSession.sharedInstance()
+    
+    // Pre-prepared haptic generators for better performance
+    private let lightHaptic = UIImpactFeedbackGenerator(style: .light)
+    private let mediumHaptic = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyHaptic = UIImpactFeedbackGenerator(style: .heavy)
+    private let notificationHaptic = UINotificationFeedbackGenerator()
     
     // MARK: - Initialization
     init() {
         setupAudioSession()
         setupAudioEngine()
+        prepareHaptics()
+    }
+    
+    private func prepareHaptics() {
+        lightHaptic.prepare()
+        mediumHaptic.prepare()
+        heavyHaptic.prepare()
+        notificationHaptic.prepare()
     }
     
     // MARK: - Setup
@@ -110,40 +125,55 @@ class AudioFeedbackService: ObservableObject {
             
         case .locked:
             playSystemSound(.locked)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            mediumHaptic.impactOccurred(intensity: 0.8)
+            mediumHaptic.prepare() // Re-prepare for next use
             
         case .countdown(let number):
             playCountdownBeep(for: number)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            // Different intensity for different countdown numbers
+            let intensity: CGFloat = number == 1 ? 0.9 : 0.6
+            lightHaptic.impactOccurred(intensity: intensity)
+            lightHaptic.prepare()
             
         case .captured:
             playSystemSound(.captured)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            notificationHaptic.notificationOccurred(.success)
+            notificationHaptic.prepare()
             
         case .error:
             playSystemSound(.error)
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            notificationHaptic.notificationOccurred(.error)
+            notificationHaptic.prepare()
         }
     }
     
     // MARK: - Proximity Sound
     private func playProximitySound(progress: Double) {
-        // Throttle proximity sound updates
-        guard abs(progress - lastProximityProgress) > 0.05 else { return }
+        // Throttle proximity sound updates more aggressively
+        guard abs(progress - lastProximityProgress) > 0.1 else { return }
         lastProximityProgress = progress
         
-        // Map progress (0.0 to 1.0) to frequency (200 Hz to 800 Hz)
-        let minFrequency: Float = 200.0
-        let maxFrequency: Float = 800.0
+        // Map progress (0.0 to 1.0) to frequency (250 Hz to 700 Hz) - narrower, more pleasant range
+        let minFrequency: Float = 250.0
+        let maxFrequency: Float = 700.0
         let frequency = minFrequency + Float(progress) * (maxFrequency - minFrequency)
         
-        playTone(frequency: frequency, duration: 0.1)
+        // Shorter duration for less intrusive feedback
+        playTone(frequency: frequency, duration: 0.08)
         
-        // Haptic feedback based on progress
+        // Throttle haptics - only when progress crosses certain thresholds
+        let now = Date()
+        guard now.timeIntervalSince(lastHapticTime) > 0.3 else { return }
+        
+        // Subtle haptic feedback only at key progress points
         if progress > 0.9 {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        } else if progress > 0.6 {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            lightHaptic.impactOccurred(intensity: 0.6)
+            lightHaptic.prepare()
+            lastHapticTime = now
+        } else if progress > 0.75 && lastProximityProgress <= 0.75 {
+            lightHaptic.impactOccurred(intensity: 0.4)
+            lightHaptic.prepare()
+            lastHapticTime = now
         }
     }
     
@@ -170,7 +200,7 @@ class AudioFeedbackService: ObservableObject {
         startEngineIfNeeded()
         
         let sampleRate = 44100.0
-        let amplitude: Float = 0.3 * volume
+        let amplitude: Float = 0.2 * volume // Reduced amplitude for softer sound
         let frameCount = UInt32(duration * sampleRate)
         
         // Use stereo format to match mixer format (2 channels)
@@ -183,11 +213,15 @@ class AudioFeedbackService: ObservableObject {
         
         let angularFrequency = Float(2.0 * Double.pi) * frequency / Float(sampleRate)
         
-        // Fill both channels with the same data (stereo)
+        // Fill both channels with fade in/out envelope for smoother sound
         for channel in 0..<Int(format.channelCount) {
             let channelData = floatChannelData[channel]
             for frame in 0..<Int(frameCount) {
-                let sample = sin(angularFrequency * Float(frame)) * amplitude
+                let fadeIn = min(Float(frame) / (Float(frameCount) * 0.1), 1.0)
+                let fadeOut = min(Float(frameCount - UInt32(frame)) / (Float(frameCount) * 0.2), 1.0)
+                let envelope = min(fadeIn, fadeOut)
+                
+                let sample = sin(angularFrequency * Float(frame)) * amplitude * envelope
                 channelData[frame] = sample
             }
         }
@@ -248,11 +282,8 @@ class AudioFeedbackService: ObservableObject {
     
     /// Play capture sequence (shutter + success)
     func playCaptureSequence() {
+        // Just play the capture feedback, no need for double haptic
         playFeedback(.captured)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        }
     }
     
     // MARK: - Settings
@@ -280,14 +311,19 @@ class AudioFeedbackService: ObservableObject {
 extension AudioFeedbackService {
     /// Provide haptic feedback for validation progress
     func provideHapticFeedback(for status: ValidationStatus) {
+        guard isEnabled else { return }
+        
         switch status {
         case .locked:
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            notificationHaptic.notificationOccurred(.success)
+            notificationHaptic.prepare()
         case .valid:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            mediumHaptic.impactOccurred(intensity: 0.7)
+            mediumHaptic.prepare()
         case .adjusting(let progress):
-            if progress > 0.8 {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            if progress > 0.85 {
+                lightHaptic.impactOccurred(intensity: 0.5)
+                lightHaptic.prepare()
             }
         case .invalid:
             break // No haptic for invalid
