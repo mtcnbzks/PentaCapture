@@ -203,38 +203,6 @@ struct CaptureFlowView: View {
             
             Spacer()
             
-                // Manual capture button with hint
-                VStack(spacing: 8) {
-                    Button(action: {
-                        Task {
-                            await viewModel.manualCapture()
-                        }
-                    }) {
-                        ZStack {
-                            Circle()
-                                .stroke(Color.white, lineWidth: 4)
-                                .frame(width: 70, height: 70)
-                            
-                            Circle()
-                                .fill(Color.white)
-                                .frame(width: 60, height: 60)
-                        }
-                        .shadow(radius: 2)
-                    }
-                    .disabled(viewModel.isCapturing || viewModel.isCountingDown)
-                    
-                    // Helper text
-                    Text("Çekmek için dokun")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.8))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.6))
-                        )
-                }
-            
             Spacer()
             
             // Review button (if photos exist)
@@ -298,8 +266,8 @@ struct AngleInstructionView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             
-            // Manual capture hint
-            Text("Otomatik çekim bekle veya alttaki butona dokun")
+            // Auto capture hint
+            Text("Doğru pozisyonda durun, otomatik çekim başlayacak")
                 .font(.caption)
                 .foregroundColor(.yellow.opacity(0.9))
                 .padding(.top, 4)
