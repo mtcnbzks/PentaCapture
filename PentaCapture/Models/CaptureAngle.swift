@@ -38,7 +38,7 @@ enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
         case .vertex:
             return "Telefonu tepenizin üzerine tutun"
         case .donorArea:
-            return "Telefonu ense bölgenize doğru tutun"
+            return "Başınızı öne eğin, telefonu ense bölgenize tutun"
         }
     }
     
@@ -49,7 +49,7 @@ enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
         switch self {
         case .frontFace, .rightProfile, .leftProfile: return 0.0  // Face level with camera
         case .vertex: return 60.0  // Phone above head, user looking up at camera
-        case .donorArea: return 0.0  // Phone behind head, relaxed posture
+        case .donorArea: return 160.0  // Head tilted down, phone behind head pointing at nape
         }
     }
     
@@ -58,7 +58,7 @@ enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
         switch self {
         case .frontFace, .rightProfile, .leftProfile: return 15.0  // Reasonably strict for face views
         case .vertex: return 25.0  // Moderate for top view
-        case .donorArea: return 30.0  // More flexible for back view
+        case .donorArea: return 30.0  // More flexible for back/nape view
         }
     }
     

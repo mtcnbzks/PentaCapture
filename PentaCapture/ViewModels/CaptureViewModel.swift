@@ -567,7 +567,7 @@ class CaptureViewModel: ObservableObject {
             }
 
             print("📸 Calling cameraService.capturePhoto()...")
-            let image = try await cameraService.capturePhoto()
+            var image = try await cameraService.capturePhoto()
             print("✅ Photo captured successfully! Image size: \(image.size)")
 
             // If we paused ARKit, stop camera and resume ARKit
@@ -577,6 +577,14 @@ class CaptureViewModel: ObservableObject {
 
                 print("▶️ Resuming ARKit...")
                 faceTrackingService.startTracking()
+            }
+
+            // Rotate donor area photo 180° (phone is held upside down)
+            if session.currentAngle == .donorArea {
+                if let rotatedImage = image.rotated180() {
+                    image = rotatedImage
+                    print("🔄 Donor area photo rotated 180°")
+                }
             }
 
             // Play success feedback
@@ -857,6 +865,40 @@ class CaptureViewModel: ObservableObject {
             timeSpent: stats.totalTimeSpent,
             deviceInfo: deviceInfo  // Stored internally, exported at session level
         )
+    }
+}
+
+// MARK: - UIImage Extension
+extension UIImage {
+    /// Rotate image 180 degrees
+    func rotated180() -> UIImage? {
+        guard let cgImage = self.cgImage else { return nil }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+        
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo.rawValue
+        ) else { return nil }
+        
+        // Rotate 180 degrees
+        context.translateBy(x: CGFloat(width), y: CGFloat(height))
+        context.rotate(by: .pi)
+        
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        guard let rotatedCGImage = context.makeImage() else { return nil }
+        
+        return UIImage(cgImage: rotatedCGImage, scale: self.scale, orientation: self.imageOrientation)
     }
 }
 
