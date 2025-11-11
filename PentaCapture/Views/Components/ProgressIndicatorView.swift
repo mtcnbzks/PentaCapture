@@ -13,7 +13,7 @@ struct ProgressIndicatorView: View {
   let capturedAngles: Set<CaptureAngle>
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: 10) {
       ForEach(CaptureAngle.allCases) { angle in
         AngleIndicator(
           angle: angle,
@@ -22,11 +22,11 @@ struct ProgressIndicatorView: View {
         )
       }
     }
-    .padding(.horizontal, 20)
-    .padding(.vertical, 12)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
     .background(
       Capsule()
-        .fill(Color.black.opacity(0.6))
+        .fill(Color.black.opacity(0.5))
     )
   }
 }
@@ -41,24 +41,24 @@ struct AngleIndicator: View {
     ZStack {
       Circle()
         .fill(backgroundColor)
-        .frame(width: 40, height: 40)
+        .frame(width: 32, height: 32)
 
       if isCaptured {
         Image(systemName: "checkmark")
-          .font(.system(size: 16, weight: .bold))
+          .font(.system(size: 13, weight: .bold))
           .foregroundColor(.white)
       } else {
         Text("\(angle.rawValue + 1)")
-          .font(.system(size: 16, weight: .semibold))
+          .font(.system(size: 13, weight: .semibold))
           .foregroundColor(textColor)
       }
     }
     .overlay(
       Circle()
         .stroke(isCurrent ? Color.white : Color.clear, lineWidth: 2)
-        .frame(width: 44, height: 44)
+        .frame(width: 36, height: 36)
     )
-    .scaleEffect(isCurrent ? 1.1 : 1.0)
+    .scaleEffect(isCurrent ? 1.05 : 1.0)
     .animation(.spring(response: 0.3), value: isCurrent)
   }
 

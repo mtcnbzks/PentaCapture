@@ -245,6 +245,9 @@ class CaptureViewModel: ObservableObject {
       print("   Has pose: \(faceTrackingService.currentHeadPose != nil)")
     }
 
+    // İlk 3 açıda yüz ekranda olmalı, son 2 açıda yüz ekrandan çıkabilir
+    let requiresFaceDetection = currentAngle == .frontFace || currentAngle == .rightProfile || currentAngle == .leftProfile
+    
     // ARKit'ten yüz pozisyonu al
     guard let headPose = faceTrackingService.currentHeadPose else {
       // Yüz tespit edilemedi
@@ -252,6 +255,56 @@ class CaptureViewModel: ObservableObject {
         print("   ❌ No head pose from ARKit")
       }
 
+      // Vertex ve donorArea için yüz tespit edilemese bile devam edebilir
+      // (yüz frame'in dışında olabilir - bu normal)
+      if !requiresFaceDetection {
+        if validationLogCount % 30 == 1 {
+          print("   ℹ️  No face detected but OK for \(currentAngle.title) - face can be off-screen")
+        }
+        
+        // Device orientation (IMU) kullanarak validation
+        let deviceOrientation = motionService.currentOrientation
+        let devicePitch = deviceOrientation?.pitchDegrees ?? 0.0
+        let pitchError = abs(devicePitch - currentAngle.targetPitch)
+        
+        // Device pitch'e göre validation durumu
+        let orientationStatus: ValidationStatus
+        if pitchError <= currentAngle.pitchTolerance {
+          orientationStatus = .valid
+        } else {
+          let progress = max(0, 1.0 - (pitchError / (currentAngle.pitchTolerance * 2)))
+          orientationStatus = progress < 0.3 ? .invalid : .adjusting(progress: progress)
+        }
+        
+        if validationLogCount % 30 == 1 {
+          print("   📱 Device pitch: \(String(format: "%.1f", devicePitch))° (target: \(String(format: "%.1f", currentAngle.targetPitch))°)")
+        }
+        
+        let partialValidation = PoseValidation(
+          orientationValidation: OrientationValidation(
+            status: orientationStatus,
+            currentPitch: devicePitch,
+            targetPitch: currentAngle.targetPitch,
+            pitchError: pitchError,
+            currentYaw: nil,
+            targetYaw: nil,
+            yawError: nil
+          ),
+          detectionValidation: DetectionValidation(
+            status: .valid,  // Face detection not required
+            boundingBox: nil,
+            size: 1.0,
+            centerOffset: .zero,
+            isDetected: false
+          ),
+          isStable: orientationStatus.isValid,
+          stabilityDuration: orientationStatus.isValid ? 1.0 : 0.0
+        )
+        currentValidation = partialValidation
+        return
+      }
+
+      // İlk 3 açıda yüz tespit edilemezse hata
       let failedValidation = PoseValidation(
         orientationValidation: OrientationValidation(
           status: .invalid,
@@ -299,17 +352,24 @@ class CaptureViewModel: ObservableObject {
     let centerOffset = headPose.centerOffset
     let centerDistance = sqrt(centerOffset.x * centerOffset.x + centerOffset.y * centerOffset.y)
 
-    // frontFace için yüz merkezde olmalı (maksimum 0.5 normalized birim uzaklık)
-    // Diğer açılar için daha toleranslı (maksimum 1.0)
-    let maxCenterDistance: CGFloat = currentAngle == .frontFace ? 0.5 : 1.0
-    let isCentered = centerDistance <= maxCenterDistance
-
+    // İlk 3 açıda (frontFace, rightProfile, leftProfile) yüz ekranda olmalı
+    // Son 2 açıda (vertex, donorArea) yüz ekrandan çıkabilir
+    let requiresFaceOnScreen = currentAngle == .frontFace || currentAngle == .rightProfile || currentAngle == .leftProfile
+    
     let detectionStatus: ValidationStatus
-    if !isCentered && currentAngle == .frontFace {
-      // frontFace için merkez kontrolü kritik
-      let centerProgress = max(0, 1.0 - Double(centerDistance / maxCenterDistance))
-      detectionStatus = centerProgress < 0.3 ? .invalid : .adjusting(progress: centerProgress)
+    if requiresFaceOnScreen {
+      // İlk 3 açı: Yüz merkezde olmalı
+      let maxCenterDistance: CGFloat = currentAngle == .frontFace ? 0.5 : 0.7  // frontFace daha strict
+      let isCentered = centerDistance <= maxCenterDistance
+      
+      if !isCentered {
+        let centerProgress = max(0, 1.0 - Double(centerDistance / maxCenterDistance))
+        detectionStatus = centerProgress < 0.3 ? .invalid : .adjusting(progress: centerProgress)
+      } else {
+        detectionStatus = .valid
+      }
     } else {
+      // Vertex ve donorArea: Yüz ekrandan çıkabilir, merkez kontrolü yok
       detectionStatus = .valid
     }
 

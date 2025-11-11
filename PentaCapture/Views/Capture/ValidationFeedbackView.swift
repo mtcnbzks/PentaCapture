@@ -94,7 +94,7 @@ struct ValidationMetricsView: View {
   let validation: PoseValidation
 
   var body: some View {
-    // Yaw metric (Face direction) - Most important for user
+    // Yaw metric (Face direction) - for frontFace, leftProfile, rightProfile
     if let currentYaw = validation.orientationValidation.currentYaw,
       let targetYaw = validation.orientationValidation.targetYaw
     {
@@ -134,6 +134,68 @@ struct ValidationMetricsView: View {
             .fill(yawStatusColor(yawStatus))
             .frame(width: 10, height: 10)
             .shadow(color: yawStatusColor(yawStatus).opacity(0.6), radius: 4)
+          
+          // Stability mini indicator
+          if validation.isStable {
+            Image(systemName: "checkmark.circle.fill")
+              .font(.system(size: 10))
+              .foregroundColor(.green.opacity(0.8))
+          } else {
+            Image(systemName: "circle.dotted")
+              .font(.system(size: 10))
+              .foregroundColor(.white.opacity(0.4))
+          }
+        }
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 10)
+      .background(
+        Capsule()
+          .fill(Color.black.opacity(0.5))
+      )
+      .fixedSize(horizontal: true, vertical: false)
+      .frame(maxWidth: .infinity, alignment: .center)
+    }
+    // Pitch-only metric (Device orientation) - for vertex, donorArea
+    else {
+      let currentPitch = validation.orientationValidation.currentPitch
+      let targetPitch = validation.orientationValidation.targetPitch
+      let pitchError = abs(validation.orientationValidation.pitchError)
+      let pitchStatus =
+        pitchError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
+
+      HStack(spacing: 10) {
+        // Direction arrow for pitch
+        if currentPitch > targetPitch + 5 {
+          Text("↑")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundColor(.white.opacity(0.7))
+        } else if currentPitch < targetPitch - 5 {
+          Text("↓")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundColor(.white.opacity(0.7))
+        }
+        
+        // Large current pitch value
+        Text(String(format: "%.0f°", abs(currentPitch)))
+          .font(.system(size: 36, weight: .bold, design: .rounded))
+          .foregroundColor(.white)
+          .monospacedDigit()
+          .shadow(color: .black.opacity(0.3), radius: 2)
+
+        // Minimal target reference
+        Text("→ \(String(format: "%.0f°", targetPitch))")
+          .font(.system(size: 13, weight: .medium))
+          .foregroundColor(.white.opacity(0.4))
+          .monospacedDigit()
+
+        // Minimal status indicators stacked
+        VStack(spacing: 4) {
+          // Status indicator
+          Circle()
+            .fill(yawStatusColor(pitchStatus))
+            .frame(width: 10, height: 10)
+            .shadow(color: yawStatusColor(pitchStatus).opacity(0.6), radius: 4)
           
           // Stability mini indicator
           if validation.isStable {

@@ -12,92 +12,40 @@ import SwiftUI
 struct ProximityIndicator: View {
   let progress: Double  // 0.0 - 1.0
   @State private var animateProgress: Double = 0.0
-  @State private var pulseScale: CGFloat = 1.0
 
   var body: some View {
-    VStack(spacing: 16) {
-      // Large circular progress ring
-      ZStack {
-        // Background circle
-        Circle()
-          .stroke(Color.white.opacity(0.2), lineWidth: 20)
-          .frame(width: 160, height: 160)
+    // Minimal circular progress ring
+    ZStack {
+      // Background circle
+      Circle()
+        .stroke(Color.white.opacity(0.15), lineWidth: 12)
+        .frame(width: 100, height: 100)
 
-        // Progress arc
-        Circle()
-          .trim(from: 0, to: animateProgress)
-          .stroke(
-            progressColor,
-            style: StrokeStyle(lineWidth: 20, lineCap: .round)
-          )
-          .frame(width: 160, height: 160)
-          .rotationEffect(.degrees(-90))
-          .shadow(color: progressColor.opacity(0.8), radius: 10)
-
-        // Pulsing inner circle when near perfect
-        if progress > 0.85 {
-          Circle()
-            .fill(progressColor.opacity(0.3))
-            .frame(width: 120, height: 120)
-            .scaleEffect(pulseScale)
-        }
-
-        // Center content
-        VStack(spacing: 4) {
-          Text("\(Int(progress * 100))")
-            .font(.system(size: 48, weight: .heavy, design: .rounded))
-            .foregroundColor(.white)
-            .contentTransition(.numericText())
-
-          Text("%")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundColor(.white.opacity(0.8))
-        }
-      }
-
-      // Distance bars - horizontal progress indicator
-      HStack(spacing: 4) {
-        ForEach(0..<10, id: \.self) { index in
-          RoundedRectangle(cornerRadius: 2)
-            .fill(index < Int(progress * 10) ? progressColor : Color.white.opacity(0.3))
-            .frame(width: 28, height: 8)
-            .animation(
-              .spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.02),
-              value: progress)
-        }
-      }
-
-      // Status text
-      Text(statusText)
-        .font(.headline)
-        .fontWeight(.bold)
-        .foregroundColor(progressColor)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-        .background(
-          Capsule()
-            .fill(progressColor.opacity(0.2))
-            .overlay(
-              Capsule()
-                .stroke(progressColor, lineWidth: 2)
-            )
+      // Progress arc
+      Circle()
+        .trim(from: 0, to: animateProgress)
+        .stroke(
+          progressColor,
+          style: StrokeStyle(lineWidth: 12, lineCap: .round)
         )
+        .frame(width: 100, height: 100)
+        .rotationEffect(.degrees(-90))
+        .shadow(color: progressColor.opacity(0.6), radius: 8)
+
+      // Center percentage (compact)
+      Text("\(Int(progress * 100))%")
+        .font(.system(size: 32, weight: .bold, design: .rounded))
+        .foregroundColor(.white)
+        .contentTransition(.numericText())
     }
     .onChange(of: progress) { newValue in
-      withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
         animateProgress = newValue
       }
     }
     .onAppear {
-      withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
         animateProgress = progress
-      }
-
-      // Pulse animation when near perfect
-      if progress > 0.85 {
-        withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-          pulseScale = 1.15
-        }
       }
     }
   }

@@ -36,13 +36,12 @@ struct CaptureFlowView: View {
           .padding(.top, 8)
           .frame(maxWidth: .infinity)
 
-        Spacer()
-
-        // Instructions for current angle
+        // Instructions for current angle - positioned near top
         if showingInstructions && !viewModel.isCountingDown {
           AngleInstructionView(angle: viewModel.session.currentAngle)
             .transition(.move(edge: .top).combined(with: .opacity))
             .frame(maxWidth: .infinity)
+            .padding(.top, 12)
         }
 
         Spacer()
@@ -338,7 +337,6 @@ struct AngleInstructionView: View {
         .fill(Color.black.opacity(0.6))
     )
     .padding(.horizontal, 20)
-    .padding(.top, 20)
     .fixedSize(horizontal: false, vertical: true)
   }
 }
