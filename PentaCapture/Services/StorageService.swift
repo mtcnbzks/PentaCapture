@@ -74,22 +74,24 @@ class StorageService: ObservableObject {
     if #available(iOS 14, *) {
       PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
         DispatchQueue.main.async {
-          self?.authorizationStatus = status
-          self?.isAuthorized = (status == .authorized || status == .limited)
+          guard let self = self else { return }
+          self.authorizationStatus = status
+          self.isAuthorized = (status == .authorized || status == .limited)
 
-          if !self!.isAuthorized {
-            self?.error = .unauthorized
+          if !self.isAuthorized {
+            self.error = .unauthorized
           }
         }
       }
     } else {
       PHPhotoLibrary.requestAuthorization { [weak self] status in
         DispatchQueue.main.async {
-          self?.authorizationStatus = status
-          self?.isAuthorized = (status == .authorized)
+          guard let self = self else { return }
+          self.authorizationStatus = status
+          self.isAuthorized = (status == .authorized)
 
-          if !self!.isAuthorized {
-            self?.error = .unauthorized
+          if !self.isAuthorized {
+            self.error = .unauthorized
           }
         }
       }

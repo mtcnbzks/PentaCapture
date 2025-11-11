@@ -90,6 +90,8 @@ class CaptureViewModel: ObservableObject {
 
   // MARK: - Lifecycle
   func startCapture() {
+    print("🎬 Starting capture session...")
+    
     setupBindings()
 
     // Request authorizations if needed
@@ -115,17 +117,25 @@ class CaptureViewModel: ObservableObject {
     // ARKit provides its own camera feed, no need for separate AVCaptureSession
     if faceTrackingService.isSupported {
       print("🚀 Starting ARKit-based capture (ARKit provides camera feed)")
-      faceTrackingService.startTracking()
-
-      // Setup camera for photo capture but DON'T start session yet
-      // We'll start it only when capturing to avoid conflict with ARKit
-      if cameraService.isAuthorized {
-        print("📸 Configuring camera for photo capture (will start only during capture)")
-        cameraService.setupCaptureSession()
-        // DON'T start the session here - ARKit is using the camera
+      
+      // Small delay to ensure camera permission is fully granted
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+        guard let self = self else { return }
+        
+        self.faceTrackingService.startTracking()
+        
+        // Setup camera for photo capture but DON'T start session yet
+        // We'll start it only when capturing to avoid conflict with ARKit
+        if self.cameraService.isAuthorized {
+          print("📸 Configuring camera for photo capture (will start only during capture)")
+          self.cameraService.setupCaptureSession()
+          // DON'T start the session here - ARKit is using the camera
+        } else {
+          print("⚠️ Camera not authorized yet, will setup when authorized")
+        }
+        
+        print("✅ ARKit Face Tracking enabled (TrueDepth device)")
       }
-
-      print("✅ ARKit Face Tracking enabled (TrueDepth device)")
     } else {
       print(
         "❌ ARKit Face Tracking not available - app requires TrueDepth camera (iPhone X or later)")
@@ -136,6 +146,8 @@ class CaptureViewModel: ObservableObject {
           DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.cameraService.startSession()
           }
+        } else {
+          print("⚠️ Camera not authorized, waiting for permission...")
         }
       } else {
         cameraService.startSession()

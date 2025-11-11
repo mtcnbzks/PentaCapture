@@ -165,14 +165,14 @@ class CameraService: NSObject, ObservableObject {
     switch AVCaptureDevice.authorizationStatus(for: .video) {
     case .authorized:
       isAuthorized = true
-      setupCaptureSession()
+      // Don't auto-setup session - let caller control when to setup
+      // setupCaptureSession()
     case .notDetermined:
       AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
         Task { @MainActor in
           self?.isAuthorized = granted
-          if granted {
-            self?.setupCaptureSession()
-          }
+          // Don't auto-setup after authorization
+          // Camera session will be manually set up when needed
         }
       }
     case .denied, .restricted:
@@ -351,6 +351,8 @@ class CameraService: NSObject, ObservableObject {
         print("⚠️ Session already running")
         Task { @MainActor in
           self.isSessionRunning = true
+          // Disable idle timer to keep screen on during capture
+          UIApplication.shared.isIdleTimerDisabled = true
         }
         return
       }
@@ -361,6 +363,9 @@ class CameraService: NSObject, ObservableObject {
 
       Task { @MainActor in
         self.isSessionRunning = isRunning
+        // Disable idle timer to keep screen on during capture
+        UIApplication.shared.isIdleTimerDisabled = true
+        print("🔆 Screen idle timer disabled - screen will stay on")
       }
     }
   }
@@ -373,6 +378,10 @@ class CameraService: NSObject, ObservableObject {
 
       guard self.captureSession.isRunning else {
         print("⚠️ Session not running")
+        Task { @MainActor in
+          // Re-enable idle timer even if session wasn't running
+          UIApplication.shared.isIdleTimerDisabled = false
+        }
         return
       }
 
@@ -382,6 +391,9 @@ class CameraService: NSObject, ObservableObject {
 
       Task { @MainActor in
         self.isSessionRunning = false
+        // Re-enable idle timer to allow screen to sleep
+        UIApplication.shared.isIdleTimerDisabled = false
+        print("🌙 Screen idle timer re-enabled - screen can sleep normally")
       }
     }
   }

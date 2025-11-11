@@ -257,6 +257,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "PentaCapture needs camera access to capture hair and scalp photos from 5 different angles.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "PentaCapture uses face tracking to guide you to the correct head position for each photo angle.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Motion sensors are required to detect your phone's orientation and help you capture photos at the correct angle.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Permission is needed to save your captured photos to the gallery.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Permission is needed to save your captured photos to the gallery.";
@@ -293,6 +294,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "PentaCapture needs camera access to capture hair and scalp photos from 5 different angles.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "PentaCapture uses face tracking to guide you to the correct head position for each photo angle.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Motion sensors are required to detect your phone's orientation and help you capture photos at the correct angle.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Permission is needed to save your captured photos to the gallery.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Permission is needed to save your captured photos to the gallery.";

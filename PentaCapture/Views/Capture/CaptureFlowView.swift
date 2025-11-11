@@ -13,6 +13,7 @@ struct CaptureFlowView: View {
   @State private var showingReview = false
   @State private var showingInstructions = true
   @State private var showingAngleTransition = false
+  @AppStorage("debugMode") private var debugMode = false
   @Environment(\.dismiss) var dismiss
 
   var body: some View {
@@ -98,24 +99,26 @@ struct CaptureFlowView: View {
           .transition(.opacity)
       }
 
-      // Debug overlay (top right)
-      VStack {
-        HStack {
+      // Debug overlay (top right) - only shown when debug mode is enabled
+      if debugMode {
+        VStack {
+          HStack {
+            Spacer()
+            DebugOverlayView(
+              trackingState: viewModel.faceTrackingService.trackingState,
+              isTracking: viewModel.faceTrackingService.isTracking,
+              headPose: viewModel.faceTrackingService.currentHeadPose
+            )
+            .padding()
+          }
           Spacer()
-          DebugOverlayView(
-            trackingState: viewModel.faceTrackingService.trackingState,
-            isTracking: viewModel.faceTrackingService.isTracking,
-            headPose: viewModel.faceTrackingService.currentHeadPose
-          )
-          .padding()
         }
-        Spacer()
+        .allowsHitTesting(false)  // Don't block touch events for buttons below
       }
-      .allowsHitTesting(false)  // Don't block touch events for buttons below
     }
     .onAppear {
-      // Small delay to ensure services are initialized
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+      // Small delay to ensure services and permissions are ready
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
         viewModel.startCapture()
       }
     }

@@ -10,8 +10,11 @@ import SwiftUI
 struct ContentView: View {
   @State private var showingOnboarding = false
   @State private var showingCapture = false
+  @State private var showingSettings = false
+  @State private var shouldStartCaptureAfterOnboarding = false
   @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
   @AppStorage("appOpenCount") private var appOpenCount = 0
+  @AppStorage("debugMode") private var debugMode = false
 
   var body: some View {
     NavigationStack {
@@ -25,6 +28,20 @@ struct ContentView: View {
         .ignoresSafeArea()
 
         VStack(spacing: 40) {
+          // Settings button
+          HStack {
+            Spacer()
+            Button(action: {
+              showingSettings = true
+            }) {
+              Image(systemName: "gearshape.fill")
+                .font(.system(size: 24))
+                .foregroundColor(.white.opacity(0.7))
+                .padding()
+            }
+          }
+          .padding(.top, 8)
+
           Spacer()
 
           // App icon/logo
@@ -57,6 +74,7 @@ struct ContentView: View {
             // Start capture button
             Button(action: {
               if !hasCompletedOnboarding {
+                shouldStartCaptureAfterOnboarding = true  // Onboarding sonrası çekime geç
                 showingOnboarding = true
               } else {
                 showingCapture = true
@@ -76,6 +94,7 @@ struct ContentView: View {
 
             // View tutorial button (always available)
             Button(action: {
+              shouldStartCaptureAfterOnboarding = false  // Tutorial modunda çekim ekranına geçme
               showingOnboarding = true
             }) {
               HStack {
@@ -94,15 +113,31 @@ struct ContentView: View {
           .padding(.bottom, 40)
         }
       }
-      .sheet(isPresented: $showingOnboarding) {
+      .sheet(
+        isPresented: $showingOnboarding,
+        onDismiss: {
+          // Sheet tamamen kapandıktan sonra, eğer onboarding tamamlandıysa çekime geç
+          if shouldStartCaptureAfterOnboarding {
+            shouldStartCaptureAfterOnboarding = false
+            // Küçük bir delay ile daha smooth geçiş
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+              showingCapture = true
+            }
+          }
+        }
+      ) {
         OnboardingView {
+          // Onboarding tamamlandı
           hasCompletedOnboarding = true
+          shouldStartCaptureAfterOnboarding = true
           showingOnboarding = false
-          showingCapture = true
         }
       }
       .fullScreenCover(isPresented: $showingCapture) {
         CaptureFlowView(viewModel: CaptureViewModel())
+      }
+      .sheet(isPresented: $showingSettings) {
+        SettingsView(debugMode: $debugMode)
       }
     }
     .onAppear {
@@ -118,6 +153,46 @@ struct ContentView: View {
       }
       // Returning users (hasCompletedOnboarding == true) don't see onboarding
       // They can manually open it via "Nasıl Kullanılır?" button
+    }
+  }
+}
+
+// MARK: - Settings View
+struct SettingsView: View {
+  @Binding var debugMode: Bool
+  @Environment(\.dismiss) var dismiss
+  
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          Toggle("Debug Overlay", isOn: $debugMode)
+        } header: {
+          Text("Geliştirici Ayarları")
+        } footer: {
+          Text("ARKit tracking durumu ve yüz pozisyonu değerlerini gösterir.")
+        }
+        
+        Section {
+          HStack {
+            Text("Versiyon")
+            Spacer()
+            Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+              .foregroundColor(.secondary)
+          }
+        } header: {
+          Text("Hakkında")
+        }
+      }
+      .navigationTitle("Ayarlar")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button("Tamam") {
+            dismiss()
+          }
+        }
+      }
     }
   }
 }

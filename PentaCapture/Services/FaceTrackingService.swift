@@ -97,6 +97,8 @@ class FaceTrackingService: NSObject, ObservableObject {
 
     guard !isTracking else {
       print("⚠️ Already tracking")
+      // Make sure idle timer is disabled even if already tracking
+      UIApplication.shared.isIdleTimerDisabled = true
       return
     }
 
@@ -120,15 +122,29 @@ class FaceTrackingService: NSObject, ObservableObject {
     error = nil
     frameCount = 0
     trackingState = "Starting..."
+    
+    // Disable idle timer to keep screen on during ARKit tracking
+    UIApplication.shared.isIdleTimerDisabled = true
+    print("🔆 Screen idle timer disabled - screen will stay on")
 
     print("✅ ARSession started")
   }
 
   func stopTracking() {
-    guard isTracking else { return }
+    guard isTracking else {
+      // Re-enable idle timer even if not tracking
+      UIApplication.shared.isIdleTimerDisabled = false
+      return
+    }
+    
+    print("⏹️ Stopping ARKit Face Tracking...")
     arSession.pause()
     isTracking = false
     currentHeadPose = nil
+    
+    // Re-enable idle timer to allow screen to sleep
+    UIApplication.shared.isIdleTimerDisabled = false
+    print("🌙 Screen idle timer re-enabled - screen can sleep normally")
   }
 
   // Extract HeadPose from ARFaceAnchor
