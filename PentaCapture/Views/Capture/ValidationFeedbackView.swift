@@ -12,28 +12,12 @@ struct ValidationFeedbackView: View {
   let validation: PoseValidation?
 
   var body: some View {
-    VStack(spacing: 16) {
-      // Status indicator
-      StatusIndicatorView(status: validation?.overallStatus ?? .invalid)
-
-      // Primary feedback message
+    VStack(spacing: 0) {
       if let validation = validation {
-        Text(validation.primaryFeedback)
-          .font(.headline)
-          .foregroundColor(.white)
-          .multilineTextAlignment(.center)
-          .padding(.horizontal)
-          .shadow(color: .black.opacity(0.5), radius: 2)
-
-        // Detailed metrics
+        // Only show detailed metrics - minimal design
         ValidationMetricsView(validation: validation)
       }
     }
-    .padding(16)
-    .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(Color.black.opacity(0.7))
-    )
     .fixedSize(horizontal: false, vertical: true)
   }
 }
@@ -110,85 +94,67 @@ struct ValidationMetricsView: View {
   let validation: PoseValidation
 
   var body: some View {
-    VStack(spacing: 6) {
-      // Yaw metric (Face direction) - Most important for user
-      if let currentYaw = validation.orientationValidation.currentYaw,
-        let targetYaw = validation.orientationValidation.targetYaw
-      {
-        let yawError = abs(currentYaw - targetYaw)
-        let yawStatus =
-          yawError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
+    // Yaw metric (Face direction) - Most important for user
+    if let currentYaw = validation.orientationValidation.currentYaw,
+      let targetYaw = validation.orientationValidation.targetYaw
+    {
+      let yawError = abs(currentYaw - targetYaw)
+      let yawStatus =
+        yawError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
 
-        HStack(spacing: 6) {
-          // Direction arrow and value
-          HStack(spacing: 3) {
-            if currentYaw < -5 {
-              Text("←")
-                .font(.system(size: 14, weight: .bold))
-            } else if currentYaw > 5 {
-              Text("→")
-                .font(.system(size: 14, weight: .bold))
-            }
-            Text(String(format: "%.0f°", abs(currentYaw)))
-              .font(.system(size: 16, weight: .bold))
-              .monospacedDigit()
-          }
-          .foregroundColor(.white)
-
+      HStack(spacing: 10) {
+        // Direction arrow (if needed)
+        if currentYaw < -5 {
+          Text("←")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundColor(.white.opacity(0.7))
+        } else if currentYaw > 5 {
           Text("→")
-            .font(.system(size: 10))
-            .foregroundColor(.white.opacity(0.4))
-
-          Text(String(format: "%.0f°", targetYaw))
-            .font(.system(size: 13, weight: .medium))
-            .foregroundColor(.white.opacity(0.6))
-            .monospacedDigit()
-
-          Spacer()
-
-          Circle()
-            .fill(yawStatusColor(yawStatus))
-            .frame(width: 6, height: 6)
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundColor(.white.opacity(0.7))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-          RoundedRectangle(cornerRadius: 6)
-            .fill(Color.black.opacity(0.5))
-            .overlay(
-              RoundedRectangle(cornerRadius: 6)
-                .stroke(yawStatusColor(yawStatus), lineWidth: 1)
-            )
-        )
-      }
+        
+        // Large current angle value - MAIN FOCUS
+        Text(String(format: "%.0f°", abs(currentYaw)))
+          .font(.system(size: 36, weight: .bold, design: .rounded))
+          .foregroundColor(.white)
+          .monospacedDigit()
+          .shadow(color: .black.opacity(0.3), radius: 2)
 
-      // Compact status row - other metrics
-      HStack(spacing: 8) {
-        // Stability indicator
-        HStack(spacing: 3) {
-          Image(systemName: "target")
-            .font(.system(size: 9))
-          Text(String(format: "%.1fs", validation.stabilityDuration))
-            .font(.system(size: 10, weight: .medium))
-            .monospacedDigit()
-        }
+        // Minimal target reference
+        Text("→ \(String(format: "%.0f°", targetYaw))")
+          .font(.system(size: 13, weight: .medium))
+          .foregroundColor(.white.opacity(0.4))
+          .monospacedDigit()
 
         Spacer()
 
-        // Face detection indicator
-        if validation.detectionValidation.isDetected {
-          HStack(spacing: 3) {
-            Image(systemName: "face.smiling")
-              .font(.system(size: 9))
-            Circle()
-              .fill(statusColor(validation.detectionValidation.status))
-              .frame(width: 6, height: 6)
+        // Minimal status indicators stacked
+        VStack(spacing: 4) {
+          // Status indicator
+          Circle()
+            .fill(yawStatusColor(yawStatus))
+            .frame(width: 10, height: 10)
+            .shadow(color: yawStatusColor(yawStatus).opacity(0.6), radius: 4)
+          
+          // Stability mini indicator
+          if validation.isStable {
+            Image(systemName: "checkmark.circle.fill")
+              .font(.system(size: 10))
+              .foregroundColor(.green.opacity(0.8))
+          } else {
+            Image(systemName: "circle.dotted")
+              .font(.system(size: 10))
+              .foregroundColor(.white.opacity(0.4))
           }
         }
       }
-      .foregroundColor(.white.opacity(0.7))
-      .font(.caption2)
-      .padding(.horizontal, 4)
+      .padding(.horizontal, 16)
+      .padding(.vertical, 10)
+      .background(
+        Capsule()
+          .fill(Color.black.opacity(0.5))
+      )
     }
   }
 
