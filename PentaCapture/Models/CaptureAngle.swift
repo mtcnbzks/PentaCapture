@@ -8,7 +8,7 @@
 import Foundation
 
 /// Saç/baş fotoğrafı için 5 kritik açı
-enum CaptureAngle: Int, CaseIterable, Identifiable {
+enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
     case frontFace = 0      // Ön yüz
     case rightProfile = 1   // Sağ profil
     case leftProfile = 2    // Sol profil

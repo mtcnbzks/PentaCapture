@@ -10,18 +10,115 @@ import UIKit
 import SwiftUI
 import Combine
 
+/// Validation scores captured at the moment of photo capture
+struct ValidationScores: Codable {
+    let pitchAccuracy: Double      // 0.0 to 1.0
+    let yawAccuracy: Double?       // 0.0 to 1.0 (optional for some angles)
+    let centeringAccuracy: Double  // 0.0 to 1.0
+    let stabilityScore: Double     // 0.0 to 1.0
+    let overallScore: Double       // 0.0 to 1.0 (average)
+    
+    init(pitchAccuracy: Double, yawAccuracy: Double? = nil, centeringAccuracy: Double, stabilityScore: Double) {
+        self.pitchAccuracy = pitchAccuracy
+        self.yawAccuracy = yawAccuracy
+        self.centeringAccuracy = centeringAccuracy
+        self.stabilityScore = stabilityScore
+        
+        // Calculate overall score
+        var components = [pitchAccuracy, centeringAccuracy, stabilityScore]
+        if let yawAccuracy = yawAccuracy {
+            components.append(yawAccuracy)
+        }
+        self.overallScore = components.reduce(0, +) / Double(components.count)
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case pitchAccuracy = "pitch_accuracy"
+        case yawAccuracy = "yaw_accuracy"
+        case centeringAccuracy = "centering_accuracy"
+        case stabilityScore = "stability_score"
+        case overallScore = "overall_score"
+    }
+}
+
+/// Device pose at the moment of capture
+struct CaptureDevicePose: Codable {
+    let devicePitch: Double      // Device pitch in degrees
+    let deviceRoll: Double       // Device roll in degrees
+    let deviceYaw: Double        // Device yaw in degrees
+    let deviceTilt: Double       // Device tilt angle (0-180°, from horizontal)
+    let headPitch: Double?       // Face/head pitch in degrees (from ARKit)
+    let headYaw: Double?         // Face/head yaw in degrees (from ARKit)
+    let headRoll: Double?        // Face/head roll in degrees (from ARKit)
+    
+    enum CodingKeys: String, CodingKey {
+        case devicePitch = "device_pitch"
+        case deviceRoll = "device_roll"
+        case deviceYaw = "device_yaw"
+        case deviceTilt = "device_tilt"
+        case headPitch = "head_pitch"
+        case headYaw = "head_yaw"
+        case headRoll = "head_roll"
+    }
+}
+
+/// Extended metadata for ML model training
+struct CaptureMetadata: Codable {
+    let captureId: UUID
+    let sessionId: UUID
+    let angle: CaptureAngle
+    let angleIndex: Int          // 0-4 (order in sequence)
+    let timestamp: Date
+    let validationScores: ValidationScores
+    let devicePose: CaptureDevicePose
+    let imageWidth: Double       // Image width in pixels
+    let imageHeight: Double      // Image height in pixels
+    let attemptCount: Int        // How many attempts for this angle
+    let timeSpent: TimeInterval  // Time spent to capture this angle
+    
+    enum CodingKeys: String, CodingKey {
+        case captureId = "capture_id"
+        case sessionId = "session_id"
+        case angle
+        case angleIndex = "angle_index"
+        case timestamp
+        case validationScores = "validation_scores"
+        case devicePose = "device_pose"
+        case imageWidth = "image_width"
+        case imageHeight = "image_height"
+        case attemptCount = "attempt_count"
+        case timeSpent = "time_spent_seconds"
+    }
+    
+    init(captureId: UUID, sessionId: UUID, angle: CaptureAngle, angleIndex: Int, timestamp: Date, validationScores: ValidationScores, devicePose: CaptureDevicePose, imageSize: CGSize, attemptCount: Int, timeSpent: TimeInterval) {
+        self.captureId = captureId
+        self.sessionId = sessionId
+        self.angle = angle
+        self.angleIndex = angleIndex
+        self.timestamp = timestamp
+        self.validationScores = validationScores
+        self.devicePose = devicePose
+        self.imageWidth = Double(imageSize.width)
+        self.imageHeight = Double(imageSize.height)
+        self.attemptCount = attemptCount
+        self.timeSpent = timeSpent
+    }
+}
+
 /// Represents a single captured photo with metadata
 struct CapturedPhoto: Identifiable, Codable {
     let id: UUID
     let angle: CaptureAngle
     let timestamp: Date
     let imageData: Data
+    let metadata: CaptureMetadata?  // Extended metadata for ML
     
-    init(id: UUID = UUID(), angle: CaptureAngle, timestamp: Date = Date(), image: UIImage) {
+    init(id: UUID = UUID(), angle: CaptureAngle, timestamp: Date = Date(), image: UIImage, metadata: CaptureMetadata? = nil) {
         self.id = id
         self.angle = angle
         self.timestamp = timestamp
         self.imageData = image.jpegData(compressionQuality: 0.9) ?? Data()
+        self.metadata = metadata
     }
     
     /// Get UIImage from stored data
@@ -30,7 +127,7 @@ struct CapturedPhoto: Identifiable, Codable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, angle, timestamp, imageData
+        case id, angle, timestamp, imageData, metadata
     }
     
     init(from decoder: Decoder) throws {
@@ -40,6 +137,7 @@ struct CapturedPhoto: Identifiable, Codable {
         angle = CaptureAngle(rawValue: angleRawValue) ?? .frontFace
         timestamp = try container.decode(Date.self, forKey: .timestamp)
         imageData = try container.decode(Data.self, forKey: .imageData)
+        metadata = try container.decodeIfPresent(CaptureMetadata.self, forKey: .metadata)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -48,6 +146,7 @@ struct CapturedPhoto: Identifiable, Codable {
         try container.encode(angle.rawValue, forKey: .angle)
         try container.encode(timestamp, forKey: .timestamp)
         try container.encode(imageData, forKey: .imageData)
+        try container.encodeIfPresent(metadata, forKey: .metadata)
     }
 }
 
@@ -181,7 +280,9 @@ class CaptureSession: ObservableObject {
     
     /// Start tracking time for current angle
     func startAngleCapture(for angle: CaptureAngle) {
-        angleStats[angle]?.startTime = Date()
+        var stats = angleStats[angle] ?? AngleCaptureStats(angle: angle)
+        stats.startTime = Date()
+        angleStats[angle] = stats
         print("⏱️ Started tracking time for \(angle.title)")
     }
     
@@ -223,6 +324,81 @@ class CaptureSession: ObservableObject {
                 isCompleted: stats.isCompleted
             )
         }
+    }
+    
+    // MARK: - ML Export
+    
+    /// Export session as JSON for ML model training/backend upload
+    func exportAsJSON(includeImages: Bool = false) throws -> Data {
+        let export = SessionExport(
+            sessionId: sessionId,
+            startTime: startTime,
+            completionTime: Date(),
+            photos: capturedPhotos,
+            includeImages: includeImages
+        )
+        
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        
+        return try encoder.encode(export)
+    }
+    
+    /// Export only metadata (without images) - for analytics/backend
+    func exportMetadataJSON() throws -> Data {
+        return try exportAsJSON(includeImages: false)
+    }
+    
+    /// Save JSON export to file
+    func saveJSONExport(to url: URL, includeImages: Bool = false) throws {
+        let data = try exportAsJSON(includeImages: includeImages)
+        try data.write(to: url)
+        print("✅ Session exported to: \(url.path)")
+    }
+}
+
+/// Session export structure for ML/Backend
+struct SessionExport: Codable {
+    let sessionId: UUID
+    let startTime: Date
+    let completionTime: Date
+    let totalDuration: TimeInterval
+    let photosMetadata: [CaptureMetadata]
+    let images: [String: String]?  // angle.rawValue : base64EncodedImage (if includeImages)
+    
+    init(sessionId: UUID, startTime: Date, completionTime: Date, photos: [CapturedPhoto], includeImages: Bool) {
+        self.sessionId = sessionId
+        self.startTime = startTime
+        self.completionTime = completionTime
+        self.totalDuration = completionTime.timeIntervalSince(startTime)
+        
+        // Extract metadata
+        self.photosMetadata = photos.compactMap { $0.metadata }
+        
+        // Optionally include base64-encoded images
+        if includeImages {
+            var imagesDict: [String: String] = [:]
+            for photo in photos {
+                if let image = photo.image,
+                   let jpegData = image.jpegData(compressionQuality: 0.8) {
+                    let base64String = jpegData.base64EncodedString()
+                    imagesDict["\(photo.angle.rawValue)"] = base64String
+                }
+            }
+            self.images = imagesDict
+        } else {
+            self.images = nil
+        }
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "session_id"
+        case startTime = "start_time"
+        case completionTime = "completion_time"
+        case totalDuration = "total_duration_seconds"
+        case photosMetadata = "photos_metadata"
+        case images
     }
 }
 

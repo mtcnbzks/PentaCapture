@@ -21,6 +21,9 @@ struct ReviewView: View {
     @State private var showingShareSheet = false
     @State private var showProfessionalGrid = true // Toggle between layouts
     @State private var showHeatMap = false
+    @State private var exportedJSONURL: URL?
+    @State private var exportError: String?
+    @State private var isExportingJSON = false
     
     var body: some View {
         ZStack {
@@ -92,6 +95,21 @@ struct ReviewView: View {
             }
         } message: {
             Text("\(session.capturedCount) fotoğraf başarıyla galerinize kaydedildi.")
+        }
+        .sheet(item: Binding(
+            get: { exportedJSONURL.map { IdentifiableURL(url: $0) } },
+            set: { exportedJSONURL = $0?.url }
+        )) { identifiableURL in
+            ActivityViewControllerRepresentable(activityItems: [identifiableURL.url])
+        }
+        .alert("Export Hatası", isPresented: .constant(exportError != nil)) {
+            Button("Tamam", role: .cancel) {
+                exportError = nil
+            }
+        } message: {
+            if let error = exportError {
+                Text(error)
+            }
         }
     }
     
@@ -186,6 +204,30 @@ struct ReviewView: View {
                 .cornerRadius(12)
             }
             .disabled(session.capturedCount == 0)
+            
+            // Export JSON (for ML/Backend)
+            Button(action: {
+                exportSessionJSON()
+            }) {
+                HStack(spacing: 10) {
+                    if isExportingJSON {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 22))
+                        Text("JSON Export (ML)")
+                            .font(.system(size: 18))
+                            .fontWeight(.semibold)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(session.capturedCount > 0 ? Color.purple : Color.purple.opacity(0.5))
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            .disabled(session.capturedCount == 0 || isExportingJSON)
         }
         .padding()
         .background(Color.black.opacity(0.6))
@@ -205,6 +247,53 @@ struct ReviewView: View {
                 await MainActor.run {
                     isSaving = false
                     // Show error
+                }
+            }
+        }
+    }
+    
+    private func exportSessionJSON() {
+        isExportingJSON = true
+        
+        Task {
+            do {
+                // Create temporary file URL with proper extension
+                let tempDir = FileManager.default.temporaryDirectory
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+                let dateString = dateFormatter.string(from: Date())
+                let filename = "pentacapture_\(dateString).json"
+                let fileURL = tempDir.appendingPathComponent(filename)
+                
+                // Export session as JSON (with metadata, without images)
+                try session.saveJSONExport(to: fileURL, includeImages: false)
+                
+                // Verify file
+                let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
+                let fileSize = try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int
+                
+                print("✅ JSON exported successfully")
+                print("📄 Path: \(fileURL.path)")
+                print("📄 File exists: \(fileExists)")
+                print("📄 File size: \(fileSize ?? 0) bytes")
+                
+                // Read and verify JSON content
+                if let jsonData = try? Data(contentsOf: fileURL),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    print("📄 JSON preview (first 200 chars):")
+                    print(String(jsonString.prefix(200)))
+                }
+                
+                await MainActor.run {
+                    isExportingJSON = false
+                    // Set URL which will automatically trigger the share sheet
+                    exportedJSONURL = fileURL
+                }
+            } catch {
+                print("❌ JSON export failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    isExportingJSON = false
+                    exportError = "JSON export başarısız: \(error.localizedDescription)"
                 }
             }
         }
@@ -370,7 +459,24 @@ struct InfoRow: View {
     }
 }
 
-/// UIViewControllerRepresentable wrapper for UIActivityViewController
+/// Basit UIActivityViewController wrapper
+struct ActivityViewControllerRepresentable: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: nil
+        )
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No updates needed
+    }
+}
+
+/// Legacy wrapper for other share sheets
 struct ActivityViewController: UIViewControllerRepresentable {
     let activityViewController: UIActivityViewController
     
@@ -381,6 +487,12 @@ struct ActivityViewController: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
         // No updates needed
     }
+}
+
+/// Identifiable wrapper for URL to use with sheet(item:)
+struct IdentifiableURL: Identifiable {
+    let id = UUID()
+    let url: URL
 }
 
 // MARK: - Preview

@@ -16,19 +16,44 @@ enum CameraError: LocalizedError {
     case captureSessionNotRunning
     case captureFailed
     case noCameraAvailable
+    case insufficientLight
+    case deviceTooUnstable
     
     var errorDescription: String? {
         switch self {
         case .unauthorized:
-            return "Kamera erişim izni verilmedi. Lütfen Ayarlar'dan izin verin."
+            return "Kamera erişim izni gerekli"
         case .configurationFailed:
-            return "Kamera yapılandırılamadı."
+            return "Kamera yapılandırma hatası"
         case .captureSessionNotRunning:
-            return "Kamera çalışmıyor."
+            return "Kamera çalışmıyor"
         case .captureFailed:
-            return "Fotoğraf çekimi başarısız oldu."
+            return "Fotoğraf çekimi başarısız"
         case .noCameraAvailable:
-            return "Bu cihazda kullanılabilir kamera bulunamadı."
+            return "Kamera bulunamadı"
+        case .insufficientLight:
+            return "Yetersiz ışık"
+        case .deviceTooUnstable:
+            return "Cihaz çok hareketli"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .unauthorized:
+            return "PentaCapture'ın çalışması için kamera izni gereklidir. Lütfen Ayarlar > PentaCapture > Kamera bölümünden izin verin."
+        case .configurationFailed:
+            return "Kamera yapılandırılırken bir hata oluştu. Lütfen uygulamayı yeniden başlatın. Sorun devam ederse cihazınızı yeniden başlatın."
+        case .captureSessionNotRunning:
+            return "Kamera servisi başlatılamadı. Lütfen bir süre bekleyip tekrar deneyin."
+        case .captureFailed:
+            return "Fotoğraf çekimi sırasında bir hata oluştu. Lütfen tekrar deneyin."
+        case .noCameraAvailable:
+            return "Bu cihazda ön kamera bulunamadı. Lütfen farklı bir cihaz kullanın."
+        case .insufficientLight:
+            return "Fotoğraf çekimi için yeterli ışık yok. Lütfen daha aydınlık bir ortamda çekim yapın."
+        case .deviceTooUnstable:
+            return "Cihazınızı daha sabit tutun. Hareketli çekimler kalitesiz fotoğraflara neden olur."
         }
     }
 }

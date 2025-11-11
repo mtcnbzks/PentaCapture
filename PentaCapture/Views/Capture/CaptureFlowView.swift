@@ -33,22 +33,24 @@ struct CaptureFlowView: View {
                 // Top bar
                 topBar
                     .padding(.top, 8)
+                    .frame(maxWidth: .infinity)
                 
                 Spacer()
                 
                 // Instructions for current angle
-                if showingInstructions {
+                if showingInstructions && !viewModel.isCountingDown {
                     AngleInstructionView(angle: viewModel.session.currentAngle)
                         .transition(.move(edge: .top).combined(with: .opacity))
+                        .frame(maxWidth: .infinity)
                 }
                 
                 Spacer()
                 
                 // Validation feedback with Proximity Indicator
-                if let validation = viewModel.currentValidation, !viewModel.isCountingDown {
+                if let validation = viewModel.currentValidation, !viewModel.isCountingDown && !viewModel.showSuccess {
                     VStack(spacing: 16) {
                         // Large Proximity Indicator (Brief's key requirement)
-                        if validation.progress > 0.3 && !viewModel.showSuccess {
+                        if validation.progress > 0.3 {
                             ProximityIndicator(progress: validation.progress)
                                 .transition(.scale.combined(with: .opacity))
                         }
@@ -64,6 +66,7 @@ struct CaptureFlowView: View {
                 
                 // Bottom controls
                 bottomControls
+                    .frame(maxWidth: .infinity)
             }
             
             // Minimal center crosshair only (no big rectangle)
@@ -103,6 +106,7 @@ struct CaptureFlowView: View {
                 }
                 Spacer()
             }
+            .allowsHitTesting(false) // Don't block touch events for buttons below
         }
         .onAppear {
             // Small delay to ensure services are initialized

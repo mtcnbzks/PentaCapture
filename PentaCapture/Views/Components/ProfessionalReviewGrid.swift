@@ -17,9 +17,6 @@ struct ProfessionalReviewGrid: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Header stats
-                ReviewStatsHeader(session: session)
-                
                 // Timeline layout
                 VStack(spacing: 20) {
                     // Face angles section (3 photos)

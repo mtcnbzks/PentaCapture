@@ -41,9 +41,23 @@ enum FaceTrackingError: LocalizedError {
     
     var errorDescription: String? {
         switch self {
-        case .notSupported: return "Bu cihazda yüz takibi desteklenmiyor"
-        case .sessionFailed: return "ARSession başlatılamadı"
-        case .noFaceDetected: return "Yüz tespit edilemedi"
+        case .notSupported: 
+            return "Bu cihazda yüz takibi desteklenmiyor"
+        case .sessionFailed: 
+            return "ARSession başlatılamadı"
+        case .noFaceDetected: 
+            return "Yüz tespit edilemedi"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .notSupported:
+            return "PentaCapture, iPhone X veya daha yeni bir cihaz gerektirir. Lütfen TrueDepth kamerası olan bir cihaz kullanın."
+        case .sessionFailed:
+            return "Uygulamayı yeniden başlatmayı deneyin. Sorun devam ederse lütfen cihazınızı yeniden başlatın."
+        case .noFaceDetected:
+            return "Yüzünüzün kamera görüş alanında olduğundan ve ortamın yeterince aydınlık olduğundan emin olun."
         }
     }
 }

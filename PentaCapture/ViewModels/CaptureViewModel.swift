@@ -28,6 +28,7 @@ class CaptureViewModel: ObservableObject {
     nonisolated(unsafe) let audioService: AudioFeedbackService
     nonisolated(unsafe) let storageService: StorageService
     nonisolated(unsafe) let faceTrackingService: FaceTrackingService // ARKit Face Tracking (TrueDepth only)
+    nonisolated(unsafe) let motionService: MotionService // CoreMotion for device orientation
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
@@ -44,12 +45,14 @@ class CaptureViewModel: ObservableObject {
         cameraService: CameraService = CameraService(),
         audioService: AudioFeedbackService = AudioFeedbackService(),
         storageService: StorageService = StorageService(),
-        faceTrackingService: FaceTrackingService = FaceTrackingService()
+        faceTrackingService: FaceTrackingService = FaceTrackingService(),
+        motionService: MotionService = MotionService()
     ) {
         self.cameraService = cameraService
         self.audioService = audioService
         self.storageService = storageService
         self.faceTrackingService = faceTrackingService
+        self.motionService = motionService
         self.session = CaptureSession()
     }
     
@@ -101,6 +104,14 @@ class CaptureViewModel: ObservableObject {
         // Start services
         audioService.startProximityFeedback()
         
+        // Start CoreMotion for device orientation tracking
+        if motionService.isAvailable {
+            motionService.startTracking()
+            print("✅ CoreMotion tracking started")
+        } else {
+            print("⚠️ CoreMotion not available on this device")
+        }
+        
         // Start ARKit Face Tracking (REQUIRED - TrueDepth only)
         // ARKit provides its own camera feed, no need for separate AVCaptureSession
         if faceTrackingService.isSupported {
@@ -146,6 +157,7 @@ class CaptureViewModel: ObservableObject {
         // Per Apple documentation: Stop services to save battery
         audioService.stopProximityFeedback()
         faceTrackingService.stopTracking() // Stop ARKit Face Tracking
+        motionService.stopTracking() // Stop CoreMotion
 
         // Only stop camera session if it was actually running
         // (it shouldn't be running when using ARKit for preview)
@@ -169,6 +181,7 @@ class CaptureViewModel: ObservableObject {
 
         // Pause without fully stopping - maintain state
         audioService.stopProximityFeedback()
+        motionService.stopTracking()
 
         // Pause ARKit if it's being used
         if faceTrackingService.isSupported {
@@ -189,6 +202,11 @@ class CaptureViewModel: ObservableObject {
         }
 
         audioService.startProximityFeedback()
+        
+        // Resume CoreMotion
+        if motionService.isAvailable {
+            motionService.startTracking()
+        }
 
         // Resume ARKit if supported (it will handle camera)
         if faceTrackingService.isSupported {
@@ -564,14 +582,23 @@ class CaptureViewModel: ObservableObject {
             // Play success feedback
             audioService.playCaptureSequence()
 
-            // Create captured photo
+            // IMPORTANT: Record attempt FIRST to calculate timeSpent
+            // This updates the stats before we create metadata
+            session.recordAttempt(for: session.currentAngle, successful: true)
+
+            // Now create metadata with updated stats
+            let metadata = createCaptureMetadata(
+                for: session.currentAngle,
+                imageSize: image.size,
+                validation: currentValidation
+            )
+
+            // Create captured photo with metadata
             let photo = CapturedPhoto(
                 angle: session.currentAngle,
-                image: image
+                image: image,
+                metadata: metadata
             )
-            
-            // Record successful capture attempt with statistics
-            session.recordAttempt(for: session.currentAngle, successful: true)
 
             // Add to session
             session.addPhoto(photo)
@@ -703,6 +730,105 @@ class CaptureViewModel: ObservableObject {
     
     var canProceed: Bool {
         session.hasPhoto(for: session.currentAngle)
+    }
+    
+    // MARK: - Metadata Creation
+    
+    /// Create capture metadata for ML model
+    private func createCaptureMetadata(
+        for angle: CaptureAngle,
+        imageSize: CGSize,
+        validation: PoseValidation?
+    ) -> CaptureMetadata {
+        // Get current device orientation
+        let deviceOrientation = motionService.currentOrientation
+        
+        // Get current head pose
+        let headPose = faceTrackingService.currentHeadPose
+        
+        // Calculate validation scores
+        let validationScores: ValidationScores
+        if let validation = validation {
+            let pitchAccuracy: Double
+            if let orientValidation = validation.orientationValidation as OrientationValidation? {
+                let pitchError = abs(orientValidation.pitchError)
+                let pitchTolerance = angle.pitchTolerance
+                pitchAccuracy = max(0, 1.0 - (pitchError / (pitchTolerance * 2)))
+            } else {
+                pitchAccuracy = 0.5
+            }
+            
+            let yawAccuracy: Double?
+            if let targetYaw = angle.targetYaw,
+               let orientValidation = validation.orientationValidation as OrientationValidation?,
+               let yawError = orientValidation.yawError {
+                let yawTolerance = angle.yawTolerance
+                yawAccuracy = max(0, 1.0 - (abs(yawError) / (yawTolerance * 2)))
+            } else {
+                yawAccuracy = nil
+            }
+            
+            let centeringAccuracy: Double
+            if let detectionValidation = validation.detectionValidation as DetectionValidation? {
+                let centerDistance = sqrt(
+                    detectionValidation.centerOffset.x * detectionValidation.centerOffset.x +
+                    detectionValidation.centerOffset.y * detectionValidation.centerOffset.y
+                )
+                centeringAccuracy = max(0, 1.0 - Double(centerDistance))
+            } else {
+                centeringAccuracy = 0.5
+            }
+            
+            let stabilityScore = validation.isStable ? 1.0 : (validation.stabilityDuration / PoseValidation.requiredStabilityDuration)
+            
+            validationScores = ValidationScores(
+                pitchAccuracy: pitchAccuracy,
+                yawAccuracy: yawAccuracy,
+                centeringAccuracy: centeringAccuracy,
+                stabilityScore: stabilityScore
+            )
+        } else {
+            // No validation available - use default values
+            validationScores = ValidationScores(
+                pitchAccuracy: 0.5,
+                yawAccuracy: nil,
+                centeringAccuracy: 0.5,
+                stabilityScore: 0.5
+            )
+        }
+        
+        // Create device pose
+        let devicePose = CaptureDevicePose(
+            devicePitch: deviceOrientation?.pitchDegrees ?? 0,
+            deviceRoll: deviceOrientation?.rollDegrees ?? 0,
+            deviceYaw: deviceOrientation?.yawDegrees ?? 0,
+            deviceTilt: deviceOrientation?.tiltAngleDegrees ?? 0,
+            headPitch: headPose?.pitchDegrees,
+            headYaw: headPose?.yawDegrees,
+            headRoll: headPose?.rollDegrees
+        )
+        
+        // Get attempt statistics
+        let stats = session.angleStats[angle] ?? AngleCaptureStats(angle: angle)
+        
+        // Log the stats we're using for metadata
+        print("📊 Creating metadata for \(angle.title):")
+        print("   Attempts: \(stats.attempts)")
+        print("   Time spent: \(String(format: "%.2f", stats.totalTimeSpent))s")
+        
+        // Create full metadata
+        return CaptureMetadata(
+            captureId: UUID(),
+            sessionId: session.sessionId,
+            angle: angle,
+            angleIndex: angle.rawValue,
+            timestamp: Date(),
+            validationScores: validationScores,
+            devicePose: devicePose,
+            imageSize: imageSize,
+            attemptCount: stats.attempts,
+            timeSpent: stats.totalTimeSpent
+        )
     }
 }
 
