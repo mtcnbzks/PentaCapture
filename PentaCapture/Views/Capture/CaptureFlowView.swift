@@ -341,63 +341,54 @@ struct AngleInstructionView: View {
   }
 }
 
-/// Detailed debug overlay for demo - shows tracking state and pose values
+/// Minimal debug overlay - compact info display
 struct DebugOverlayView: View {
   let trackingState: String
   let isTracking: Bool
   let headPose: HeadPose?
 
   var body: some View {
-    VStack(alignment: .trailing, spacing: 8) {
-      // Tracking status with indicator
-      HStack(spacing: 6) {
-        VStack(alignment: .trailing, spacing: 2) {
-          Text("ARKit Tracking")
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
-            .foregroundColor(.white.opacity(0.7))
-          HStack(spacing: 4) {
-            Circle()
-              .fill(isTracking ? Color.green : Color.red)
-              .frame(width: 8, height: 8)
-              .shadow(color: isTracking ? .green : .red, radius: 4)
-            Text(trackingState)
-              .font(.system(size: 11, weight: .bold, design: .monospaced))
-              .foregroundColor(isTracking ? .green : .red)
-          }
-        }
+    VStack(alignment: .trailing, spacing: 3) {
+      // Compact tracking status
+      HStack(spacing: 4) {
+        Circle()
+          .fill(isTracking ? Color.green : Color.red)
+          .frame(width: 6, height: 6)
+        Text(trackingState)
+          .font(.system(size: 9, weight: .semibold, design: .monospaced))
+          .foregroundColor(.white.opacity(0.8))
       }
 
-      // Pose values (detailed for demo)
+      // Minimal pose values
       if let pose = headPose {
-        Divider()
-          .background(Color.white.opacity(0.2))
-          .frame(height: 1)
-
-        VStack(alignment: .trailing, spacing: 4) {
-          Text("Head Pose")
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
-            .foregroundColor(.white.opacity(0.7))
-
-          PoseValueRow(label: "Yaw", value: pose.yawDegrees, color: .cyan)
-          PoseValueRow(label: "Pitch", value: pose.pitchDegrees, color: .orange)
-          PoseValueRow(label: "Roll", value: pose.rollDegrees, color: .purple)
+        HStack(spacing: 6) {
+          Text("Y")
+            .font(.system(size: 8, weight: .medium))
+            .foregroundColor(.cyan.opacity(0.7))
+          Text(String(format: "%+.0f°", pose.yawDegrees))
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .foregroundColor(.cyan)
+        }
+        
+        HStack(spacing: 6) {
+          Text("P")
+            .font(.system(size: 8, weight: .medium))
+            .foregroundColor(.orange.opacity(0.7))
+          Text(String(format: "%+.0f°", pose.pitchDegrees))
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .foregroundColor(.orange)
         }
       } else {
-        Text("No Face Detected")
-          .font(.system(size: 10, weight: .medium, design: .rounded))
-          .foregroundColor(.red)
+        Text("No Face")
+          .font(.system(size: 8, weight: .medium))
+          .foregroundColor(.red.opacity(0.8))
       }
     }
-    .padding(10)
+    .padding(6)
     .background(
-      RoundedRectangle(cornerRadius: 10)
-        .fill(Color.black.opacity(0.75))
-        .overlay(
-          RoundedRectangle(cornerRadius: 10)
-            .stroke(isTracking ? Color.green.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
-        )
+      RoundedRectangle(cornerRadius: 6)
+        .fill(Color.black.opacity(0.6))
     )
-    .shadow(color: .black.opacity(0.3), radius: 8)
   }
 }
 

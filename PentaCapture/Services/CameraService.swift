@@ -253,20 +253,20 @@ class CameraService: NSObject, ObservableObject {
 
     captureSession.addOutput(photoOutput)
 
-    // Configure photo output for HEIC with speed optimization
+    // Configure photo output for HEIC with maximum quality
     photoOutput.isHighResolutionCaptureEnabled = true
 
-    // SPEED prioritization for fast HEIC encoding (iOS 13+)
+    // QUALITY prioritization for maximum quality (iOS 13+)
     if #available(iOS 13.0, *) {
-      photoOutput.maxPhotoQualityPrioritization = .speed  // Fast HEIC!
-      print("📸 Photo output configured for SPEED prioritization with HEIC support")
+      photoOutput.maxPhotoQualityPrioritization = .quality  // Maximum quality!
+      print("📸 Photo output configured for QUALITY prioritization with HEIC support")
     }
 
-    // Disable video stabilization - we have countdown for stability, no need for extra processing
+    // Enable video stabilization for better quality
     if let connection = photoOutput.connection(with: .video) {
       if connection.isVideoStabilizationSupported {
-        connection.preferredVideoStabilizationMode = .off
-        print("📸 Video stabilization disabled for faster capture")
+        connection.preferredVideoStabilizationMode = .auto
+        print("📸 Video stabilization enabled for better quality")
       }
     }
 
@@ -462,18 +462,18 @@ class CameraService: NSObject, ObservableObject {
       }
       
       // Configure settings
-      settings.flashMode = .off
+      settings.flashMode = .auto  // Auto flash based on scene lighting
       settings.isHighResolutionPhotoEnabled = true
 
-      // SPEED prioritization for fast capture (iOS 13+)
+      // QUALITY prioritization for maximum quality (iOS 13+)
       if #available(iOS 13.0, *) {
-        settings.photoQualityPrioritization = .speed  // Fast HEIC encoding
-        print("📸 Using SPEED prioritization with HEIC")
+        settings.photoQualityPrioritization = .quality  // Maximum quality!
+        print("📸 Using QUALITY prioritization with HEIC")
       }
 
-      // Disable auto stabilization - we have countdown for stability
+      // Enable auto stabilization for better quality
       if #available(iOS 13.0, *) {
-        settings.isAutoStillImageStabilizationEnabled = false
+        settings.isAutoStillImageStabilizationEnabled = true
       }
 
       print(
