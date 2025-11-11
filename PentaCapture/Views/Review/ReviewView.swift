@@ -18,6 +18,7 @@ struct ReviewView: View {
     @State private var selectedPhoto: CapturedPhoto?
     @State private var showingSaveConfirmation = false
     @State private var isSaving = false
+    @State private var showingShareSheet = false
     
     var body: some View {
         ZStack {
@@ -59,12 +60,17 @@ struct ReviewView: View {
                 selectedPhoto = nil
             }
         }
+        .sheet(isPresented: $showingShareSheet) {
+            if let activityVC = storageService.createShareSheet(for: session) {
+                ActivityViewController(activityViewController: activityVC)
+            }
+        }
         .alert("Fotoğraflar Kaydedildi", isPresented: $showingSaveConfirmation) {
             Button("Tamam") {
                 onComplete()
             }
         } message: {
-            Text("5 fotoğraf başarıyla galerinize kaydedildi.")
+            Text("\(session.capturedCount) fotoğraf başarıyla galerinize kaydedildi.")
         }
     }
     
@@ -90,37 +96,44 @@ struct ReviewView: View {
             Button(action: {
                 saveToGallery()
             }) {
-                HStack {
+                HStack(spacing: 10) {
                     if isSaving {
                         ProgressView()
                             .tint(.white)
                     } else {
                         Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 22))
                         Text("Galeriye Kaydet")
+                            .font(.system(size: 18))
                             .fontWeight(.semibold)
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.green)
+                .background(session.capturedCount > 0 ? Color.green : Color.green.opacity(0.5))
                 .foregroundColor(.white)
                 .cornerRadius(12)
             }
-            .disabled(isSaving || session.capturedCount < session.totalCount)
+            .disabled(isSaving || session.capturedCount == 0)
             
-            // Complete button
-            Button(action: onComplete) {
-                HStack {
-                    Image(systemName: "checkmark.circle")
-                    Text("Tamamla")
+            // Share button
+            Button(action: {
+                showingShareSheet = true
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 22))
+                    Text("Paylaş")
+                        .font(.system(size: 18))
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
+                .background(session.capturedCount > 0 ? Color.blue : Color.blue.opacity(0.5))
                 .foregroundColor(.white)
                 .cornerRadius(12)
             }
+            .disabled(session.capturedCount == 0)
         }
         .padding()
         .background(Color.black.opacity(0.6))
@@ -302,6 +315,19 @@ struct InfoRow: View {
                 .fontWeight(.medium)
                 .foregroundColor(.white)
         }
+    }
+}
+
+/// UIViewControllerRepresentable wrapper for UIActivityViewController
+struct ActivityViewController: UIViewControllerRepresentable {
+    let activityViewController: UIActivityViewController
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        return activityViewController
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No updates needed
     }
 }
 
