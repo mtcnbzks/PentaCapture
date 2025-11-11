@@ -76,6 +76,9 @@ class FaceTrackingService: NSObject, ObservableObject {
   nonisolated(unsafe) let isSupported: Bool
   let arSession = ARSession()  // Public - ARSCNView için gerekli
   private var frameCount = 0
+  
+  // Idle timer management - auto-enable after 2 minutes
+  private var idleTimerTask: Task<Void, Never>?
 
   override nonisolated init() {
     self.isSupported = ARFaceTrackingConfiguration.isSupported
@@ -126,6 +129,9 @@ class FaceTrackingService: NSObject, ObservableObject {
     // Disable idle timer to keep screen on during ARKit tracking
     UIApplication.shared.isIdleTimerDisabled = true
     print("🔆 Screen idle timer disabled - screen will stay on")
+    
+    // Auto-enable idle timer after 2 minutes
+    scheduleIdleTimerReenable()
 
     print("✅ ARSession started")
   }
@@ -142,9 +148,38 @@ class FaceTrackingService: NSObject, ObservableObject {
     isTracking = false
     currentHeadPose = nil
     
+    // Cancel any pending idle timer re-enable
+    cancelIdleTimerReenable()
     // Re-enable idle timer to allow screen to sleep
     UIApplication.shared.isIdleTimerDisabled = false
     print("🌙 Screen idle timer re-enabled - screen can sleep normally")
+  }
+
+  // MARK: - Idle Timer Management
+  private func scheduleIdleTimerReenable() {
+    // Cancel any existing task
+    cancelIdleTimerReenable()
+    
+    print("⏱️ Scheduling idle timer re-enable in 2 minutes")
+    idleTimerTask = Task { @MainActor in
+      // Wait 2 minutes (120 seconds)
+      try? await Task.sleep(nanoseconds: 120_000_000_000)
+      
+      // Check if task was cancelled
+      guard !Task.isCancelled else {
+        print("⏱️ Idle timer re-enable cancelled")
+        return
+      }
+      
+      // Re-enable idle timer after 2 minutes
+      UIApplication.shared.isIdleTimerDisabled = false
+      print("🌙 Auto re-enabled idle timer after 2 minutes - screen can now sleep")
+    }
+  }
+  
+  private func cancelIdleTimerReenable() {
+    idleTimerTask?.cancel()
+    idleTimerTask = nil
   }
 
   // Extract HeadPose from ARFaceAnchor

@@ -650,8 +650,8 @@ class CaptureViewModel: ObservableObject {
           print("📸 Starting camera session for capture...")
           cameraService.startSession()
 
-          // Wait for camera to warm up and stabilize
-          try await Task.sleep(nanoseconds: 500_000_000)  // 0.5 seconds
+          // Minimal wait for camera to warm up (speed optimized)
+          try await Task.sleep(nanoseconds: 200_000_000)  // 0.2 seconds (was 0.5)
         }
       }
 
@@ -703,9 +703,9 @@ class CaptureViewModel: ObservableObject {
         "✅ Photo added to session. Total photos: \(session.capturedPhotos.count)/\(CaptureAngle.allCases.count)"
       )
 
-      // Brief success flash (very quick - for visual feedback only)
+      // Brief success flash (ultra quick - for visual feedback only)
       showSuccess = true
-      try await Task.sleep(nanoseconds: 300_000_000)  // 0.3 seconds - just a quick flash
+      try await Task.sleep(nanoseconds: 200_000_000)  // 0.2 seconds - ultra quick flash
       showSuccess = false
 
       isCapturing = false

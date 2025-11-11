@@ -82,6 +82,9 @@ class CameraService: NSObject, ObservableObject {
 
   private var videoDataOutputDelegate: VideoDataOutputDelegate?
   private var photoCaptureDelegate: PhotoCaptureDelegate?
+  
+  // Idle timer management - auto-enable after 2 minutes
+  private var idleTimerTask: Task<Void, Never>?
 
   // Publisher for video frames
   let framePublisher = PassthroughSubject<CVPixelBuffer, Never>()
@@ -250,18 +253,20 @@ class CameraService: NSObject, ObservableObject {
 
     captureSession.addOutput(photoOutput)
 
-    // Configure photo output for HEIC/HEVC capture
+    // Configure photo output for HEIC with speed optimization
     photoOutput.isHighResolutionCaptureEnabled = true
 
-    // Enable max quality for better HEIC results (iOS 13+)
+    // SPEED prioritization for fast HEIC encoding (iOS 13+)
     if #available(iOS 13.0, *) {
-      photoOutput.maxPhotoQualityPrioritization = .quality
+      photoOutput.maxPhotoQualityPrioritization = .speed  // Fast HEIC!
+      print("📸 Photo output configured for SPEED prioritization with HEIC support")
     }
 
-    // Video stabilization
+    // Disable video stabilization - we have countdown for stability, no need for extra processing
     if let connection = photoOutput.connection(with: .video) {
       if connection.isVideoStabilizationSupported {
-        connection.preferredVideoStabilizationMode = .auto
+        connection.preferredVideoStabilizationMode = .off
+        print("📸 Video stabilization disabled for faster capture")
       }
     }
 
@@ -366,6 +371,9 @@ class CameraService: NSObject, ObservableObject {
         // Disable idle timer to keep screen on during capture
         UIApplication.shared.isIdleTimerDisabled = true
         print("🔆 Screen idle timer disabled - screen will stay on")
+        
+        // Auto-enable idle timer after 2 minutes
+        self.scheduleIdleTimerReenable()
       }
     }
   }
@@ -391,11 +399,40 @@ class CameraService: NSObject, ObservableObject {
 
       Task { @MainActor in
         self.isSessionRunning = false
+        // Cancel any pending idle timer re-enable
+        self.cancelIdleTimerReenable()
         // Re-enable idle timer to allow screen to sleep
         UIApplication.shared.isIdleTimerDisabled = false
         print("🌙 Screen idle timer re-enabled - screen can sleep normally")
       }
     }
+  }
+
+  // MARK: - Idle Timer Management
+  private func scheduleIdleTimerReenable() {
+    // Cancel any existing task
+    cancelIdleTimerReenable()
+    
+    print("⏱️ Scheduling idle timer re-enable in 2 minutes")
+    idleTimerTask = Task { @MainActor in
+      // Wait 2 minutes (120 seconds)
+      try? await Task.sleep(nanoseconds: 120_000_000_000)
+      
+      // Check if task was cancelled
+      guard !Task.isCancelled else {
+        print("⏱️ Idle timer re-enable cancelled")
+        return
+      }
+      
+      // Re-enable idle timer after 2 minutes
+      UIApplication.shared.isIdleTimerDisabled = false
+      print("🌙 Auto re-enabled idle timer after 2 minutes - screen can now sleep")
+    }
+  }
+  
+  private func cancelIdleTimerReenable() {
+    idleTimerTask?.cancel()
+    idleTimerTask = nil
   }
 
   // MARK: - Photo Capture
@@ -408,10 +445,10 @@ class CameraService: NSObject, ObservableObject {
     print("📸 CameraService: Setting up photo capture...")
 
     return try await withCheckedThrowingContinuation { continuation in
-      // Configure photo settings for HEIC/HEVC capture
+      // Configure photo settings for HEIC/HEVC with speed optimization
       let settings: AVCapturePhotoSettings
-
-      // Directly capture in HEIC format (iOS 11+) for best quality and compression
+      
+      // Use HEIC format (iOS 11+) for best quality and compression
       if #available(iOS 11.0, *),
         photoOutput.availablePhotoCodecTypes.contains(.hevc)
       {
@@ -423,19 +460,20 @@ class CameraService: NSObject, ObservableObject {
         settings = AVCapturePhotoSettings()
         print("⚠️ HEVC not available, using default format")
       }
-
+      
       // Configure settings
       settings.flashMode = .off
       settings.isHighResolutionPhotoEnabled = true
 
-      // Maximum quality prioritization (iOS 13+)
+      // SPEED prioritization for fast capture (iOS 13+)
       if #available(iOS 13.0, *) {
-        settings.photoQualityPrioritization = .quality
+        settings.photoQualityPrioritization = .speed  // Fast HEIC encoding
+        print("📸 Using SPEED prioritization with HEIC")
       }
 
-      // Auto still image stabilization
+      // Disable auto stabilization - we have countdown for stability
       if #available(iOS 13.0, *) {
-        settings.isAutoStillImageStabilizationEnabled = true
+        settings.isAutoStillImageStabilizationEnabled = false
       }
 
       print(

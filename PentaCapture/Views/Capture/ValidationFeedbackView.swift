@@ -127,25 +127,11 @@ struct ValidationMetricsView: View {
           .foregroundColor(.white.opacity(0.4))
           .monospacedDigit()
 
-        // Minimal status indicators stacked
-        VStack(spacing: 4) {
-          // Status indicator
-          Circle()
-            .fill(yawStatusColor(yawStatus))
-            .frame(width: 10, height: 10)
-            .shadow(color: yawStatusColor(yawStatus).opacity(0.6), radius: 4)
-          
-          // Stability mini indicator
-          if validation.isStable {
-            Image(systemName: "checkmark.circle.fill")
-              .font(.system(size: 10))
-              .foregroundColor(.green.opacity(0.8))
-          } else {
-            Image(systemName: "circle.dotted")
-              .font(.system(size: 10))
-              .foregroundColor(.white.opacity(0.4))
-          }
-        }
+        // Single status indicator
+        Circle()
+          .fill(yawStatusColor(yawStatus))
+          .frame(width: 10, height: 10)
+          .shadow(color: yawStatusColor(yawStatus).opacity(0.6), radius: 4)
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
@@ -189,25 +175,11 @@ struct ValidationMetricsView: View {
           .foregroundColor(.white.opacity(0.4))
           .monospacedDigit()
 
-        // Minimal status indicators stacked
-        VStack(spacing: 4) {
-          // Status indicator
-          Circle()
-            .fill(yawStatusColor(pitchStatus))
-            .frame(width: 10, height: 10)
-            .shadow(color: yawStatusColor(pitchStatus).opacity(0.6), radius: 4)
-          
-          // Stability mini indicator
-          if validation.isStable {
-            Image(systemName: "checkmark.circle.fill")
-              .font(.system(size: 10))
-              .foregroundColor(.green.opacity(0.8))
-          } else {
-            Image(systemName: "circle.dotted")
-              .font(.system(size: 10))
-              .foregroundColor(.white.opacity(0.4))
-          }
-        }
+        // Single status indicator
+        Circle()
+          .fill(yawStatusColor(pitchStatus))
+          .frame(width: 10, height: 10)
+          .shadow(color: yawStatusColor(pitchStatus).opacity(0.6), radius: 4)
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
