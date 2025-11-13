@@ -515,56 +515,61 @@ private class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
       return
     }
 
-    // CRITICAL: Use CGImageRepresentation to preserve orientation metadata
-    // Per Apple docs: cgImageRepresentation() returns CGImage? directly
-    // Front camera photos need proper orientation handling
-    guard let cgImage = photo.cgImageRepresentation() else {
-      print("❌ PhotoCaptureDelegate: Failed to get CGImage")
+    // Get image data from photo
+    guard let imageData = photo.fileDataRepresentation() else {
+      print("❌ PhotoCaptureDelegate: Failed to get image data")
       completion(.failure(CameraError.captureFailed))
       return
     }
 
-    // Get the correct orientation from photo metadata
-    // Front camera is mirrored and may have different orientation
-    let imageOrientation = self.getImageOrientation(from: photo)
+    // Create UIImage from data (this respects EXIF orientation)
+    guard var image = UIImage(data: imageData) else {
+      print("❌ PhotoCaptureDelegate: Failed to create UIImage from data")
+      completion(.failure(CameraError.captureFailed))
+      return
+    }
 
-    // Create UIImage with correct orientation
-    let image = UIImage(
-      cgImage: cgImage,
-      scale: 1.0,
-      orientation: imageOrientation)
+    // IMPORTANT: Mirror the image horizontally to match preview
+    // Preview shows mirrored image (like a mirror), so we flip it horizontally
+    image = self.mirrorImageHorizontally(image)
 
     print(
-      "✅ PhotoCaptureDelegate: Created UIImage with orientation: \(imageOrientation.rawValue), size: \(image.size)"
+      "✅ PhotoCaptureDelegate: Created mirrored UIImage with size: \(image.size)"
     )
     completion(.success(image))
   }
 
-  // Convert AVCapturePhoto metadata orientation to UIImage orientation
-  private func getImageOrientation(from photo: AVCapturePhoto) -> UIImage.Orientation {
-    // Get orientation from photo metadata
-    // For front camera in portrait mode, we typically need .leftMirrored
-    guard let metadata = photo.metadata[String(kCGImagePropertyOrientation)] as? UInt32 else {
-      // Default for front camera portrait: leftMirrored
-      print("⚠️ No orientation metadata, using default .leftMirrored")
-      return .leftMirrored
+  // Mirror image horizontally to match what user sees in preview
+  // This flips the image along vertical axis (left becomes right, right becomes left)
+  private func mirrorImageHorizontally(_ image: UIImage) -> UIImage {
+    // Get the image size
+    let size = image.size
+    
+    // Create a new image context with the same size
+    UIGraphicsBeginImageContextWithOptions(size, false, image.scale)
+    guard let context = UIGraphicsGetCurrentContext() else {
+      print("⚠️ Failed to create graphics context, returning original image")
+      return image
     }
-
-    // Convert CGImagePropertyOrientation to UIImage.Orientation
-    // Reference: https://developer.apple.com/documentation/imageio/cgimagepropertyorientation
-    switch metadata {
-    case 1: return .up
-    case 2: return .upMirrored
-    case 3: return .down
-    case 4: return .downMirrored
-    case 5: return .leftMirrored
-    case 6: return .right
-    case 7: return .rightMirrored
-    case 8: return .left
-    default:
-      print("⚠️ Unknown orientation value: \(metadata), using .leftMirrored")
-      return .leftMirrored
+    
+    // Flip the context horizontally
+    context.translateBy(x: size.width, y: 0)
+    context.scaleBy(x: -1.0, y: 1.0)
+    
+    // Draw the image in the flipped context
+    image.draw(in: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+    
+    // Get the new mirrored image
+    let mirroredImage = UIGraphicsGetImageFromCurrentImageContext()
+    UIGraphicsEndImageContext()
+    
+    guard let finalImage = mirroredImage else {
+      print("⚠️ Failed to create mirrored image, returning original")
+      return image
     }
+    
+    print("✅ Successfully mirrored image horizontally")
+    return finalImage
   }
 }
 
