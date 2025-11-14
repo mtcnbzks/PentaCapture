@@ -40,10 +40,19 @@ struct OrientationValidation {
   let currentYaw: Double?
   let targetYaw: Double?
   let yawError: Double?
+  let currentRoll: Double?  // Donör bölgesi için
+  let targetRoll: Double?
+  let rollError: Double?
 
   var feedbackMessage: String {
     switch status {
     case .invalid:
+      // Roll kontrolü (donör bölgesi için)
+      if let rollError = rollError, let targetRoll = targetRoll, rollError > 40 {
+        return "Telefonu ters tutun (baş aşağı)"
+      }
+      
+      // Yaw kontrolü
       if let yawError = yawError, let targetYaw = targetYaw, abs(yawError) > 10 {
         if yawError > 0 {
           return targetYaw > 0

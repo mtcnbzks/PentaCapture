@@ -7,69 +7,129 @@
 
 import SwiftUI
 
-/// Quick transition without animation (for rapid captures)
+/// Modern quick transition view with glassmorphism
 struct QuickAngleTransition: View {
   let nextAngle: CaptureAngle
 
   @State private var scale: CGFloat = 0.5
   @State private var opacity: Double = 0
+  @State private var glowScale: CGFloat = 0.8
 
   var body: some View {
     ZStack {
-      Color.black.opacity(0.85)
+      // Blurred background
+      Color.black.opacity(0.7)
+        .background(.ultraThinMaterial)
         .ignoresSafeArea()
 
       VStack(spacing: 24) {
         // "Sıradaki" başlığı
         Text("SIRADAKI")
-          .font(.caption)
-          .fontWeight(.bold)
-          .foregroundColor(.blue.opacity(0.8))
+          .font(.system(size: 12, weight: .bold))
+          .foregroundStyle(
+            LinearGradient(
+              colors: [Color.blue, Color.blue.opacity(0.7)],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
           .tracking(3)
 
-        // Icon
+        // Icon with modern styling
         ZStack {
+          // Outer glow
           Circle()
-            .fill(Color.blue.opacity(0.2))
+            .fill(
+              RadialGradient(
+                colors: [Color.blue.opacity(0.3), Color.clear],
+                center: .center,
+                startRadius: 60,
+                endRadius: 90
+              )
+            )
+            .frame(width: 180, height: 180)
+            .scaleEffect(glowScale)
+          
+          // Background with glassmorphism
+          Circle()
+            .fill(Color.white.opacity(0.1))
+            .background(
+              Circle()
+                .fill(.ultraThinMaterial)
+            )
             .frame(width: 120, height: 120)
+            .shadow(color: .blue.opacity(0.5), radius: 20)
 
           Image(systemName: nextAngle.symbolName)
-            .font(.system(size: 60))
-            .foregroundColor(.blue)
+            .font(.system(size: 50, weight: .medium))
+            .foregroundStyle(
+              LinearGradient(
+                colors: [Color.blue, Color.cyan],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            )
             .scaleEffect(scale)
         }
 
-        // Angle title
+        // Angle title with gradient
         Text(nextAngle.title)
-          .font(.title)
-          .fontWeight(.bold)
-          .foregroundColor(.white)
+          .font(.system(size: 28, weight: .bold))
+          .foregroundStyle(
+            LinearGradient(
+              colors: [.white, .white.opacity(0.9)],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+          )
+          .shadow(color: .black.opacity(0.3), radius: 4)
 
-        // Instructions
+        // Instructions with better styling
         Text(nextAngle.instructions)
-          .font(.subheadline)
-          .foregroundColor(.white.opacity(0.9))
+          .font(.system(size: 15, weight: .medium))
+          .foregroundColor(.white.opacity(0.85))
           .multilineTextAlignment(.center)
           .padding(.horizontal, 40)
-          .lineSpacing(4)
+          .lineSpacing(5)
 
-        // Ready indicator
-        HStack(spacing: 8) {
+        // Ready indicator with modern design
+        HStack(spacing: 10) {
           Image(systemName: "arrow.right.circle.fill")
-            .foregroundColor(.blue)
+            .font(.system(size: 18))
+            .foregroundStyle(
+              LinearGradient(
+                colors: [Color.blue, Color.cyan],
+                startPoint: .leading,
+                endPoint: .trailing
+              )
+            )
           Text("Hazır olduğunuzda devam edin")
-            .font(.caption)
+            .font(.system(size: 13, weight: .medium))
             .foregroundColor(.white.opacity(0.7))
         }
-        .padding(.top, 8)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(
+          Capsule()
+            .fill(Color.white.opacity(0.1))
+            .background(
+              Capsule()
+                .fill(.ultraThinMaterial)
+            )
+        )
+        .padding(.top, 12)
       }
       .padding(40)
       .opacity(opacity)
     }
     .onAppear {
-      withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+      withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
         scale = 1.0
         opacity = 1.0
+        glowScale = 1.2
+      }
+      withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+        glowScale = 1.0
       }
     }
   }

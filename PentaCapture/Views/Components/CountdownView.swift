@@ -13,25 +13,57 @@ struct CountdownWithMessageView: View {
   @State private var scale: CGFloat = 1.0
 
   var body: some View {
-    // Minimal countdown - just number
-    Text("\(countdown)")
-      .font(.system(size: 80, weight: .bold, design: .rounded))
-      .foregroundColor(countdownColor)
-      .scaleEffect(scale)
-      .shadow(color: countdownColor.opacity(0.8), radius: 15)
-      .padding(30)
-      .background(
-        Circle()
-          .fill(Color.black.opacity(0.5))
-      )
-      .onChange(of: countdown) { _ in
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-          scale = 1.2
-        }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6).delay(0.1)) {
-          scale = 1.0
-        }
+    // Modern countdown with glassmorphism and glow
+    ZStack {
+      // Outer glow ring
+      Circle()
+        .fill(
+          RadialGradient(
+            colors: [countdownColor.opacity(0.4), Color.clear],
+            center: .center,
+            startRadius: 60,
+            endRadius: 100
+          )
+        )
+        .frame(width: 200, height: 200)
+        .scaleEffect(scale * 1.2)
+      
+      // Main circle with glassmorphism
+      Circle()
+        .fill(Color.black.opacity(0.3))
+        .background(
+          Circle()
+            .fill(.ultraThinMaterial)
+        )
+        .frame(width: 120, height: 120)
+        .overlay(
+          Circle()
+            .stroke(countdownColor, lineWidth: 4)
+            .frame(width: 120, height: 120)
+        )
+        .shadow(color: countdownColor.opacity(0.6), radius: 20)
+      
+      // Number with gradient
+      Text("\(countdown)")
+        .font(.system(size: 70, weight: .bold, design: .rounded))
+        .foregroundStyle(
+          LinearGradient(
+            colors: [.white, countdownColor.opacity(0.8)],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
+        .shadow(color: countdownColor.opacity(0.8), radius: 15)
+        .scaleEffect(scale)
+    }
+    .onChange(of: countdown) { _ in
+      withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
+        scale = 1.3
       }
+      withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.08)) {
+        scale = 1.0
+      }
+    }
   }
 
   private var countdownColor: Color {

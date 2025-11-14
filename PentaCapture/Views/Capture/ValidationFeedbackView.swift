@@ -94,6 +94,8 @@ struct ValidationMetricsView: View {
   let validation: PoseValidation
 
   var body: some View {
+    // Son 2 adımda (vertex, donorArea) yüz açısı göstermiyoruz - yüz yok zaten
+    // Sadece ilk 3 adımda (frontFace, rightProfile, leftProfile) göster
     // Yaw metric (Face direction) - for frontFace, leftProfile, rightProfile
     if let currentYaw = validation.orientationValidation.currentYaw,
       let targetYaw = validation.orientationValidation.targetYaw
@@ -102,94 +104,64 @@ struct ValidationMetricsView: View {
       let yawStatus =
         yawError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
 
-      HStack(spacing: 10) {
-        // Direction arrow (if needed)
+      HStack(spacing: 12) {
+        // Direction arrow (if needed) - modern icon
         if currentYaw < -5 {
-          Text("←")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundColor(.white.opacity(0.7))
+          Image(systemName: "arrow.left.circle.fill")
+            .font(.system(size: 24))
+            .foregroundColor(.white.opacity(0.8))
         } else if currentYaw > 5 {
-          Text("→")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundColor(.white.opacity(0.7))
+          Image(systemName: "arrow.right.circle.fill")
+            .font(.system(size: 24))
+            .foregroundColor(.white.opacity(0.8))
         }
         
-        // Large current angle value - MAIN FOCUS
+        // Large current angle value with gradient
         Text(String(format: "%.0f°", abs(currentYaw)))
-          .font(.system(size: 36, weight: .bold, design: .rounded))
-          .foregroundColor(.white)
+          .font(.system(size: 40, weight: .bold, design: .rounded))
+          .foregroundStyle(
+            LinearGradient(
+              colors: [.white, .white.opacity(0.9)],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+          )
           .monospacedDigit()
-          .shadow(color: .black.opacity(0.3), radius: 2)
+          .shadow(color: .black.opacity(0.4), radius: 4)
 
         // Minimal target reference
         Text("→ \(String(format: "%.0f°", targetYaw))")
-          .font(.system(size: 13, weight: .medium))
-          .foregroundColor(.white.opacity(0.4))
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundColor(.white.opacity(0.5))
           .monospacedDigit()
 
-        // Single status indicator
+        // Modern status indicator with glow
         Circle()
           .fill(yawStatusColor(yawStatus))
-          .frame(width: 10, height: 10)
-          .shadow(color: yawStatusColor(yawStatus).opacity(0.6), radius: 4)
+          .frame(width: 12, height: 12)
+          .shadow(color: yawStatusColor(yawStatus).opacity(0.8), radius: 6)
+          .overlay(
+            Circle()
+              .stroke(yawStatusColor(yawStatus).opacity(0.5), lineWidth: 2)
+              .frame(width: 20, height: 20)
+          )
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 10)
+      .padding(.horizontal, 20)
+      .padding(.vertical, 14)
       .background(
         Capsule()
-          .fill(Color.black.opacity(0.5))
+          .fill(Color.black.opacity(0.4))
+          .background(
+            Capsule()
+              .fill(.ultraThinMaterial)
+          )
       )
+      .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
       .fixedSize(horizontal: true, vertical: false)
       .frame(maxWidth: .infinity, alignment: .center)
     }
-    // Pitch-only metric (Device orientation) - for vertex, donorArea
-    else {
-      let currentPitch = validation.orientationValidation.currentPitch
-      let targetPitch = validation.orientationValidation.targetPitch
-      let pitchError = abs(validation.orientationValidation.pitchError)
-      let pitchStatus =
-        pitchError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
-
-      HStack(spacing: 10) {
-        // Direction arrow for pitch
-        if currentPitch > targetPitch + 5 {
-          Text("↑")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundColor(.white.opacity(0.7))
-        } else if currentPitch < targetPitch - 5 {
-          Text("↓")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundColor(.white.opacity(0.7))
-        }
-        
-        // Large current pitch value
-        Text(String(format: "%.0f°", abs(currentPitch)))
-          .font(.system(size: 36, weight: .bold, design: .rounded))
-          .foregroundColor(.white)
-          .monospacedDigit()
-          .shadow(color: .black.opacity(0.3), radius: 2)
-
-        // Minimal target reference
-        Text("→ \(String(format: "%.0f°", targetPitch))")
-          .font(.system(size: 13, weight: .medium))
-          .foregroundColor(.white.opacity(0.4))
-          .monospacedDigit()
-
-        // Single status indicator
-        Circle()
-          .fill(yawStatusColor(pitchStatus))
-          .frame(width: 10, height: 10)
-          .shadow(color: yawStatusColor(pitchStatus).opacity(0.6), radius: 4)
-      }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 10)
-      .background(
-        Capsule()
-          .fill(Color.black.opacity(0.5))
-      )
-      .fixedSize(horizontal: true, vertical: false)
-      .frame(maxWidth: .infinity, alignment: .center)
-    }
+    // Son 2 adımda (vertex, donorArea) hiçbir şey gösterme - yüz yok zaten
+    // Kullanıcı sadece proximity indicator'a bakacak
   }
 
   private func yawStatusColor(_ status: ValidationStatus) -> Color {
@@ -383,7 +355,10 @@ struct AnimatedValidationIndicator: View {
                 pitchError: 10,
                 currentYaw: nil,
                 targetYaw: nil,
-                yawError: nil
+                yawError: nil,
+                currentRoll: nil,
+                targetRoll: nil,
+                rollError: nil
               ),
               detectionValidation: DetectionValidation(
                 status: .invalid,
@@ -407,7 +382,10 @@ struct AnimatedValidationIndicator: View {
                 pitchError: 0,
                 currentYaw: nil,
                 targetYaw: nil,
-                yawError: nil
+                yawError: nil,
+                currentRoll: nil,
+                targetRoll: nil,
+                rollError: nil
               ),
               detectionValidation: DetectionValidation(
                 status: .valid,

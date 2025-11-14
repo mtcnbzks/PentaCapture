@@ -53,7 +53,10 @@ class AudioFeedbackService: ObservableObject {
   private let lightHaptic = UIImpactFeedbackGenerator(style: .light)
   private let mediumHaptic = UIImpactFeedbackGenerator(style: .medium)
   private let heavyHaptic = UIImpactFeedbackGenerator(style: .heavy)
+  private let rigidHaptic = UIImpactFeedbackGenerator(style: .rigid)
+  private let softHaptic = UIImpactFeedbackGenerator(style: .soft)
   private let notificationHaptic = UINotificationFeedbackGenerator()
+  private let selectionHaptic = UISelectionFeedbackGenerator()
 
   // MARK: - Initialization
   init() {
@@ -66,7 +69,10 @@ class AudioFeedbackService: ObservableObject {
     lightHaptic.prepare()
     mediumHaptic.prepare()
     heavyHaptic.prepare()
+    rigidHaptic.prepare()
+    softHaptic.prepare()
     notificationHaptic.prepare()
+    selectionHaptic.prepare()
   }
 
   // MARK: - Setup
@@ -126,15 +132,26 @@ class AudioFeedbackService: ObservableObject {
 
     case .locked:
       playSystemSound(.locked)
-      mediumHaptic.impactOccurred(intensity: 0.8)
-      mediumHaptic.prepare()  // Re-prepare for next use
+      // Stronger, more satisfying haptic for locked state
+      rigidHaptic.impactOccurred(intensity: 1.0)
+      rigidHaptic.prepare()  // Re-prepare for next use
 
     case .countdown(let number):
       playCountdownBeep(for: number)
-      // Different intensity for different countdown numbers
-      let intensity: CGFloat = number == 1 ? 0.9 : 0.6
-      lightHaptic.impactOccurred(intensity: intensity)
-      lightHaptic.prepare()
+      // Different haptic for different countdown numbers - escalating intensity
+      if number == 1 {
+        // Final countdown - strongest feedback
+        heavyHaptic.impactOccurred(intensity: 1.0)
+        heavyHaptic.prepare()
+      } else if number == 2 {
+        // Second count - medium feedback
+        mediumHaptic.impactOccurred(intensity: 0.8)
+        mediumHaptic.prepare()
+      } else {
+        // First count - light feedback
+        lightHaptic.impactOccurred(intensity: 0.6)
+        lightHaptic.prepare()
+      }
 
     case .captured:
       // AVCapturePhotoOutput automatically plays shutter sound
@@ -169,14 +186,21 @@ class AudioFeedbackService: ObservableObject {
     let now = Date()
     guard now.timeIntervalSince(lastHapticTime) > 0.3 else { return }
 
-    // Subtle haptic feedback only at key progress points
-    if progress > 0.9 {
-      lightHaptic.impactOccurred(intensity: 0.6)
-      lightHaptic.prepare()
+    // Enhanced haptic feedback at key progress points
+    if progress > 0.95 {
+      // Almost perfect - strong, sharp haptic
+      rigidHaptic.impactOccurred(intensity: 0.8)
+      rigidHaptic.prepare()
       lastHapticTime = now
-    } else if progress > 0.75 && lastProximityProgress <= 0.75 {
-      lightHaptic.impactOccurred(intensity: 0.4)
-      lightHaptic.prepare()
+    } else if progress > 0.85 && lastProximityProgress <= 0.85 {
+      // Very close - medium haptic
+      mediumHaptic.impactOccurred(intensity: 0.6)
+      mediumHaptic.prepare()
+      lastHapticTime = now
+    } else if progress > 0.7 && lastProximityProgress <= 0.7 {
+      // Getting close - soft haptic
+      softHaptic.impactOccurred(intensity: 0.5)
+      softHaptic.prepare()
       lastHapticTime = now
     }
   }
@@ -338,5 +362,32 @@ extension AudioFeedbackService {
     case .invalid:
       break  // No haptic for invalid
     }
+  }
+  
+  /// Play haptic for angle transitions
+  func playAngleTransitionHaptic() {
+    guard isEnabled else { return }
+    // Smooth, soft transition haptic
+    softHaptic.impactOccurred(intensity: 0.7)
+    softHaptic.prepare()
+  }
+  
+  /// Play haptic for successful capture
+  func playSuccessHaptic() {
+    guard isEnabled else { return }
+    // Double tap success pattern
+    notificationHaptic.notificationOccurred(.success)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+      self?.selectionHaptic.selectionChanged()
+      self?.selectionHaptic.prepare()
+    }
+    notificationHaptic.prepare()
+  }
+  
+  /// Play subtle selection haptic
+  func playSelectionHaptic() {
+    guard isEnabled else { return }
+    selectionHaptic.selectionChanged()
+    selectionHaptic.prepare()
   }
 }

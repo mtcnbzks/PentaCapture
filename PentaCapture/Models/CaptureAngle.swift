@@ -49,7 +49,7 @@ enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
     switch self {
     case .frontFace, .rightProfile, .leftProfile: return 0.0  // Face level with camera
     case .vertex: return 90.0  // Phone above head, perpendicular to ground
-    case .donorArea: return 80.0  // Phone at back of head, slightly angled
+    case .donorArea: return 165.0  // Phone at back of head, nearly upside down (180° - slight angle)
     }
   }
 
@@ -58,7 +58,25 @@ enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
     switch self {
     case .frontFace, .rightProfile, .leftProfile: return 15.0  // Reasonably strict for face views
     case .vertex: return 20.0  // Moderate tolerance for top view
-    case .donorArea: return 25.0  // More flexible for back/nape view
+    case .donorArea: return 30.0  // Very flexible for back/nape view - hard to hold steady
+    }
+  }
+  
+  // Roll (yan dönüş) için hedef açı - sadece donorArea için gerekli
+  var targetRoll: Double? {
+    switch self {
+    case .frontFace, .rightProfile, .leftProfile, .vertex: 
+      return nil  // Roll önemli değil
+    case .donorArea: 
+      return 180.0  // Telefon tamamen ters (±180°)
+    }
+  }
+  
+  // Roll toleransı
+  var rollTolerance: Double {
+    switch self {
+    case .donorArea: return 40.0  // Geniş tolerans - ±180° etrafında
+    default: return 180.0  // Diğerleri için roll önemli değil
     }
   }
 

@@ -19,98 +19,165 @@ struct ContentView: View {
   var body: some View {
     NavigationStack {
       ZStack {
-        // Gradient background
+        // Modern gradient background with multiple colors
         LinearGradient(
-          colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
+          colors: [
+            Color(red: 0.2, green: 0.4, blue: 0.9),
+            Color(red: 0.4, green: 0.2, blue: 0.8),
+            Color(red: 0.6, green: 0.1, blue: 0.7)
+          ],
           startPoint: .topLeading,
           endPoint: .bottomTrailing
         )
         .ignoresSafeArea()
+        
+        // Animated background circles for depth
+        GeometryReader { geometry in
+          ZStack {
+            Circle()
+              .fill(Color.white.opacity(0.05))
+              .frame(width: 300, height: 300)
+              .offset(x: -100, y: -100)
+            
+            Circle()
+              .fill(Color.white.opacity(0.03))
+              .frame(width: 200, height: 200)
+              .offset(x: geometry.size.width - 100, y: geometry.size.height - 150)
+          }
+        }
 
         VStack(spacing: 40) {
-          // Settings button
+          // Settings button with glassmorphism
           HStack {
             Spacer()
             Button(action: {
               showingSettings = true
             }) {
               Image(systemName: "gearshape.fill")
-                .font(.system(size: 24))
-                .foregroundColor(.white.opacity(0.7))
-                .padding()
+                .font(.system(size: 22))
+                .foregroundColor(.white)
+                .padding(12)
+                .background(
+                  RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.15))
+                    .background(
+                      RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                    )
+                )
             }
           }
+          .padding(.horizontal, 20)
           .padding(.top, 8)
 
           Spacer()
 
-          // App icon/logo
+          // Modern app icon with glow effect
           ZStack {
+            // Outer glow
             Circle()
-              .fill(Color.white.opacity(0.2))
-              .frame(width: 150, height: 150)
+              .fill(
+                RadialGradient(
+                  colors: [Color.white.opacity(0.3), Color.clear],
+                  center: .center,
+                  startRadius: 60,
+                  endRadius: 100
+                )
+              )
+              .frame(width: 200, height: 200)
+            
+            // Glassmorphic background
+            Circle()
+              .fill(Color.white.opacity(0.15))
+              .background(
+                Circle()
+                  .fill(.ultraThinMaterial)
+              )
+              .frame(width: 140, height: 140)
 
-            Image(systemName: "camera.viewfinder")
-              .font(.system(size: 70))
+            // Icon
+            Image(systemName: "camera.metering.multispot")
+              .font(.system(size: 60, weight: .light))
               .foregroundColor(.white)
+              .shadow(color: .white.opacity(0.3), radius: 10)
           }
 
-          // App title
-          VStack(spacing: 12) {
+          // App title with better typography
+          VStack(spacing: 8) {
             Text("PentaCapture")
-              .font(.system(size: 48, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+              .font(.system(size: 44, weight: .bold, design: .rounded))
+              .foregroundStyle(
+                LinearGradient(
+                  colors: [.white, .white.opacity(0.9)],
+                  startPoint: .top,
+                  endPoint: .bottom
+                )
+              )
+              .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
 
             Text("5 Açıdan Profesyonel Saç Fotoğrafı")
-              .font(.title3)
-              .foregroundColor(.white.opacity(0.9))
+              .font(.system(size: 16, weight: .medium))
+              .foregroundColor(.white.opacity(0.85))
               .multilineTextAlignment(.center)
           }
 
           Spacer()
 
-          // Action buttons
-          VStack(spacing: 16) {
-            // Start capture button
+          // Modern action buttons with glassmorphism
+          VStack(spacing: 14) {
+            // Start capture button - primary
             Button(action: {
               if !hasCompletedOnboarding {
-                shouldStartCaptureAfterOnboarding = true  // Onboarding sonrası çekime geç
+                shouldStartCaptureAfterOnboarding = true
                 showingOnboarding = true
               } else {
                 showingCapture = true
               }
             }) {
-              HStack {
+              HStack(spacing: 10) {
                 Image(systemName: "camera.fill")
+                  .font(.system(size: 18, weight: .semibold))
                 Text("Fotoğraf Çekmeye Başla")
-                  .fontWeight(.semibold)
+                  .font(.system(size: 17, weight: .semibold))
               }
               .frame(maxWidth: .infinity)
-              .padding()
-              .background(Color.white)
-              .foregroundColor(.blue)
-              .cornerRadius(16)
+              .padding(.vertical, 18)
+              .background(
+                RoundedRectangle(cornerRadius: 16)
+                  .fill(Color.white)
+                  .shadow(color: .black.opacity(0.2), radius: 12, y: 6)
+              )
+              .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.9))
             }
+            .scaleEffect(1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showingCapture)
 
-            // View tutorial button (always available)
+            // Tutorial button - secondary with glassmorphism
             Button(action: {
-              shouldStartCaptureAfterOnboarding = false  // Tutorial modunda çekim ekranına geçme
+              shouldStartCaptureAfterOnboarding = false
               showingOnboarding = true
             }) {
-              HStack {
-                Image(systemName: hasCompletedOnboarding ? "info.circle" : "play.circle")
+              HStack(spacing: 10) {
+                Image(systemName: hasCompletedOnboarding ? "info.circle.fill" : "play.circle.fill")
+                  .font(.system(size: 18, weight: .medium))
                 Text(hasCompletedOnboarding ? "Nasıl Kullanılır?" : "Rehberi Göster")
-                  .fontWeight(.medium)
+                  .font(.system(size: 16, weight: .medium))
               }
               .frame(maxWidth: .infinity)
-              .padding()
-              .background(Color.white.opacity(0.2))
+              .padding(.vertical, 16)
+              .background(
+                RoundedRectangle(cornerRadius: 16)
+                  .fill(Color.white.opacity(0.15))
+                  .background(
+                    RoundedRectangle(cornerRadius: 16)
+                      .fill(.ultraThinMaterial)
+                  )
+              )
               .foregroundColor(.white)
-              .cornerRadius(16)
             }
           }
-          .padding(.horizontal, 30)
-          .padding(.bottom, 40)
+          .padding(.horizontal, 28)
+          .padding(.bottom, 50)
         }
       }
       .sheet(

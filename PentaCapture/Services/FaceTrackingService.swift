@@ -10,7 +10,7 @@ import Combine
 import simd
 
 /// ARKit'ten gelen yüz pozisyonu bilgisi
-struct HeadPose {
+struct HeadPose: Equatable {
   let yaw: Double  // Yüz rotasyonu (sol/sağ) - radyan
   let pitch: Double  // Yüz eğimi (yukarı/aşağı) - radyan
   let roll: Double  // Yüz yatışı (yan eğim) - radyan

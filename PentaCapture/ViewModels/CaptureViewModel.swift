@@ -265,19 +265,43 @@ class CaptureViewModel: ObservableObject {
         // Device orientation (IMU) kullanarak validation
         let deviceOrientation = motionService.currentOrientation
         let devicePitch = deviceOrientation?.pitchDegrees ?? 0.0
+        let deviceRoll = deviceOrientation?.rollDegrees ?? 0.0
         let pitchError = abs(devicePitch - currentAngle.targetPitch)
         
-        // Device pitch'e göre validation durumu
+        // Donör bölgesi için ROLL kontrolü de ekle (telefonun ters tutulduğunu doğrula)
+        var rollValid = true
+        var rollError: Double = 0.0
+        if let targetRoll = currentAngle.targetRoll {
+          // Roll ±180° civarında olmalı (telefon ters)
+          // -180° ve +180° aynı pozisyon olduğu için özel hesaplama
+          let rollDiff1 = abs(deviceRoll - targetRoll)
+          let rollDiff2 = abs(deviceRoll - (targetRoll - 360.0))
+          let rollDiff3 = abs(deviceRoll - (targetRoll + 360.0))
+          rollError = min(rollDiff1, rollDiff2, rollDiff3)
+          rollValid = rollError <= currentAngle.rollTolerance
+          
+          if validationLogCount % 30 == 1 {
+            print("   📱 Device roll: \(String(format: "%.1f", deviceRoll))° (target: ±180°, error: \(String(format: "%.1f", rollError))°)")
+          }
+        }
+        
+        // Device pitch VE roll'e göre validation durumu
         let orientationStatus: ValidationStatus
-        if pitchError <= currentAngle.pitchTolerance {
+        if pitchError <= currentAngle.pitchTolerance && rollValid {
           orientationStatus = .valid
         } else {
-          let progress = max(0, 1.0 - (pitchError / (currentAngle.pitchTolerance * 2)))
-          orientationStatus = progress < 0.3 ? .invalid : .adjusting(progress: progress)
+          // Her iki faktörü de hesaba kat
+          let pitchProgress = max(0, 1.0 - (pitchError / (currentAngle.pitchTolerance * 2)))
+          let rollProgress = rollValid ? 1.0 : max(0, 1.0 - (rollError / (currentAngle.rollTolerance * 2)))
+          let combinedProgress = min(pitchProgress, rollProgress)
+          orientationStatus = combinedProgress < 0.3 ? .invalid : .adjusting(progress: combinedProgress)
         }
         
         if validationLogCount % 30 == 1 {
           print("   📱 Device pitch: \(String(format: "%.1f", devicePitch))° (target: \(String(format: "%.1f", currentAngle.targetPitch))°)")
+          if !rollValid {
+            print("   ⚠️  Phone not upside down! Roll: \(String(format: "%.1f", deviceRoll))° (needs ±180°)")
+          }
         }
         
         let partialValidation = PoseValidation(
@@ -288,7 +312,10 @@ class CaptureViewModel: ObservableObject {
             pitchError: pitchError,
             currentYaw: nil,
             targetYaw: nil,
-            yawError: nil
+            yawError: nil,
+            currentRoll: deviceRoll,
+            targetRoll: currentAngle.targetRoll,
+            rollError: rollError > 0 ? rollError : nil
           ),
           detectionValidation: DetectionValidation(
             status: .valid,  // Face detection not required
@@ -313,7 +340,10 @@ class CaptureViewModel: ObservableObject {
           pitchError: 999.0,
           currentYaw: nil,
           targetYaw: currentAngle.targetYaw,
-          yawError: nil
+          yawError: nil,
+          currentRoll: nil,
+          targetRoll: nil,
+          rollError: nil
         ),
         detectionValidation: DetectionValidation(
           status: .invalid,
@@ -407,7 +437,10 @@ class CaptureViewModel: ObservableObject {
       pitchError: pitchError,
       currentYaw: currentYaw,
       targetYaw: currentAngle.targetYaw,
-      yawError: yawError
+      yawError: yawError,
+      currentRoll: nil,  // Face tracking için roll gerekmez
+      targetRoll: nil,
+      rollError: nil
     )
 
     // Stabilite hesapla
@@ -495,13 +528,18 @@ class CaptureViewModel: ObservableObject {
       )
     }
 
-    // Countdown sequence
-    countdownValue = 3
-    print("⏱️ Countdown: \(countdownValue)")
+    // İlk 3 senaryo için daha hızlı countdown (2-1), son 2 için normal (3-2-1)
+    let isFastScenario = session.currentAngle == .frontFace || 
+                         session.currentAngle == .rightProfile || 
+                         session.currentAngle == .leftProfile
+    
+    let countdownStart = isFastScenario ? 2 : 3
+    countdownValue = countdownStart
+    print("⏱️ Countdown: \(countdownValue) (fast mode: \(isFastScenario))")
 
     // Store countdown task so we can cancel it if needed
     countdownTask = Task { @MainActor in
-      for count in (1...3).reversed() {
+      for count in (1...countdownStart).reversed() {
         // Check if task was cancelled
         if Task.isCancelled {
           print("⚠️ Countdown task cancelled")
@@ -525,8 +563,14 @@ class CaptureViewModel: ObservableObject {
 
         // No extra haptic here - countdown already provides haptic feedback
 
+        // İlk 3 senaryo için daha hızlı countdown interval
+        let isFastScenario = self.session.currentAngle == .frontFace || 
+                             self.session.currentAngle == .rightProfile || 
+                             self.session.currentAngle == .leftProfile
+        let sleepIterations = isFastScenario ? 7 : 10  // 0.7s vs 1.0s per count
+        
         // Sleep in smaller increments to check cancellation more frequently
-        for _ in 0..<10 {
+        for _ in 0..<sleepIterations {
           // Check cancellation and validation every 100ms
           if Task.isCancelled {
             print("⚠️ Countdown task cancelled during sleep")
@@ -676,8 +720,9 @@ class CaptureViewModel: ObservableObject {
         }
       }
 
-      // Play success feedback
+      // Play success feedback with enhanced haptics
       audioService.playCaptureSequence()
+      audioService.playSuccessHaptic()
 
       // IMPORTANT: Record attempt FIRST to calculate timeSpent
       // This updates the stats before we create metadata
@@ -703,9 +748,14 @@ class CaptureViewModel: ObservableObject {
         "✅ Photo added to session. Total photos: \(session.capturedPhotos.count)/\(CaptureAngle.allCases.count)"
       )
 
-      // Brief success flash (ultra quick - for visual feedback only)
+      // İlk 3 senaryo için daha hızlı success flash
+      let isFastScenario = session.currentAngle == .frontFace || 
+                           session.currentAngle == .rightProfile || 
+                           session.currentAngle == .leftProfile
+      let successDuration: UInt64 = isFastScenario ? 150_000_000 : 200_000_000  // 0.15s vs 0.2s
+      
       showSuccess = true
-      try await Task.sleep(nanoseconds: 200_000_000)  // 0.2 seconds - ultra quick flash
+      try await Task.sleep(nanoseconds: successDuration)
       showSuccess = false
 
       isCapturing = false
@@ -716,6 +766,8 @@ class CaptureViewModel: ObservableObject {
         await handleSessionComplete()
       } else {
         print("➡️ Moving to next angle: \(session.currentAngle.title)")
+        // Play transition haptic for smooth UX
+        audioService.playAngleTransitionHaptic()
         // Reset for next angle
         resetValidationState()
       }

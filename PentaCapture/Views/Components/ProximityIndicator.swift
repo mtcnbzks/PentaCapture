@@ -14,37 +14,65 @@ struct ProximityIndicator: View {
   @State private var animateProgress: Double = 0.0
 
   var body: some View {
-    // Minimal circular progress ring
+    // Modern circular progress ring with glassmorphism
     ZStack {
-      // Background circle
+      // Outer glow effect
       Circle()
-        .stroke(Color.white.opacity(0.15), lineWidth: 12)
-        .frame(width: 100, height: 100)
+        .fill(
+          RadialGradient(
+            colors: [progressColor.opacity(0.3), Color.clear],
+            center: .center,
+            startRadius: 50,
+            endRadius: 75
+          )
+        )
+        .frame(width: 150, height: 150)
+      
+      // Background circle with glassmorphism
+      Circle()
+        .stroke(Color.white.opacity(0.2), lineWidth: 14)
+        .frame(width: 110, height: 110)
+        .background(
+          Circle()
+            .fill(Color.black.opacity(0.3))
+            .background(
+              Circle()
+                .fill(.ultraThinMaterial)
+            )
+            .frame(width: 110, height: 110)
+        )
 
-      // Progress arc
+      // Progress arc with gradient
       Circle()
         .trim(from: 0, to: animateProgress)
         .stroke(
-          progressColor,
-          style: StrokeStyle(lineWidth: 12, lineCap: .round)
+          LinearGradient(
+            colors: [progressColor, progressColor.opacity(0.7)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ),
+          style: StrokeStyle(lineWidth: 14, lineCap: .round)
         )
-        .frame(width: 100, height: 100)
+        .frame(width: 110, height: 110)
         .rotationEffect(.degrees(-90))
-        .shadow(color: progressColor.opacity(0.6), radius: 8)
+        .shadow(color: progressColor.opacity(0.8), radius: 10)
 
-      // Center percentage (compact)
-      Text("\(Int(progress * 100))%")
-        .font(.system(size: 32, weight: .bold, design: .rounded))
-        .foregroundColor(.white)
-        .contentTransition(.numericText())
+      // Center content
+      VStack(spacing: 4) {
+        Text("\(Int(progress * 100))%")
+          .font(.system(size: 36, weight: .bold, design: .rounded))
+          .foregroundColor(.white)
+          .contentTransition(.numericText())
+          .shadow(color: .black.opacity(0.3), radius: 2)
+      }
     }
     .onChange(of: progress) { newValue in
-      withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+      withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
         animateProgress = newValue
       }
     }
     .onAppear {
-      withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+      withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
         animateProgress = progress
       }
     }

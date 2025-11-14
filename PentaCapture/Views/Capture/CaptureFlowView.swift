@@ -13,6 +13,7 @@ struct CaptureFlowView: View {
   @State private var showingReview = false
   @State private var showingInstructions = true
   @State private var showingAngleTransition = false
+  @State private var angleTransitionStartTime: Date?
   @AppStorage("debugMode") private var debugMode = false
   @Environment(\.dismiss) var dismiss
 
@@ -188,17 +189,26 @@ struct CaptureFlowView: View {
     .onChange(of: viewModel.session.capturedCount) { newCount in
       // Show quick angle indicator when a photo is captured (except when session is complete)
       if newCount > 0 && !viewModel.session.isComplete {
-        // Show transition briefly
+        // Show transition
         withAnimation {
           showingAngleTransition = true
+          angleTransitionStartTime = Date()
         }
-
-        // Hide after 1.2 seconds - give user time to read next angle
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-          withAnimation {
-            showingAngleTransition = false
-          }
-        }
+        
+        // Start checking for face detection (if needed for next angle)
+        checkAngleTransitionDismiss()
+      }
+    }
+    .onChange(of: viewModel.faceTrackingService.isTracking) { _ in
+      // Yüz tespit durumu değiştiğinde transition'ı kontrol et
+      if showingAngleTransition {
+        checkAngleTransitionDismiss()
+      }
+    }
+    .onChange(of: viewModel.faceTrackingService.currentHeadPose) { _ in
+      // Yüz pozisyonu tespit edildiğinde transition'ı kontrol et
+      if showingAngleTransition {
+        checkAngleTransitionDismiss()
       }
     }
     .alert("Hata", isPresented: .constant(viewModel.errorMessage != nil)) {
@@ -214,19 +224,28 @@ struct CaptureFlowView: View {
 
   private var topBar: some View {
     HStack {
-      // Close button
+      // Close button with modern styling
       Button(action: {
         dismiss()
       }) {
         Image(systemName: "xmark.circle.fill")
-          .font(.system(size: 30))
+          .font(.system(size: 28))
           .foregroundColor(.white)
-          .shadow(radius: 2)
+          .padding(8)
+          .background(
+            Circle()
+              .fill(Color.black.opacity(0.3))
+              .background(
+                Circle()
+                  .fill(.ultraThinMaterial)
+              )
+          )
+          .shadow(color: .black.opacity(0.3), radius: 8)
       }
 
       Spacer()
 
-      // Progress indicator
+      // Progress indicator (already modernized)
       ProgressIndicatorView(
         currentAngle: viewModel.session.currentAngle,
         capturedAngles: Set(viewModel.session.capturedPhotos.map { $0.angle })
@@ -234,16 +253,25 @@ struct CaptureFlowView: View {
 
       Spacer()
 
-      // Instructions toggle
+      // Instructions toggle with modern styling
       Button(action: {
-        withAnimation {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
           showingInstructions.toggle()
         }
       }) {
         Image(systemName: showingInstructions ? "info.circle.fill" : "info.circle")
-          .font(.system(size: 30))
+          .font(.system(size: 28))
           .foregroundColor(.white)
-          .shadow(radius: 2)
+          .padding(8)
+          .background(
+            Circle()
+              .fill(Color.black.opacity(0.3))
+              .background(
+                Circle()
+                  .fill(.ultraThinMaterial)
+              )
+          )
+          .shadow(color: .black.opacity(0.3), radius: 8)
       }
     }
     .padding()
@@ -251,31 +279,43 @@ struct CaptureFlowView: View {
 
   private var bottomControls: some View {
     HStack(spacing: 30) {
-      // Skip/Previous button
+      // Skip/Previous button with modern styling
       if viewModel.session.currentAngle.rawValue > 0 {
         Button(action: {
           viewModel.goToPreviousAngle()
         }) {
-          Image(systemName: "chevron.left.circle")
+          Image(systemName: "chevron.left.circle.fill")
             .font(.system(size: 44))
             .foregroundColor(.white)
-            .shadow(radius: 2)
+            .background(
+              Circle()
+                .fill(Color.black.opacity(0.3))
+                .frame(width: 50, height: 50)
+            )
+            .shadow(color: .black.opacity(0.3), radius: 8)
         }
+        .transition(.scale.combined(with: .opacity))
       }
 
       Spacer()
 
       Spacer()
 
-      // Review button (if photos exist)
+      // Review button with modern styling
       if !viewModel.session.capturedPhotos.isEmpty {
         Button(action: {
           showingReview = true
         }) {
           ZStack {
-            RoundedRectangle(cornerRadius: 8)
-              .fill(Color.white)
-              .frame(width: 44, height: 44)
+            // Background with glassmorphism
+            RoundedRectangle(cornerRadius: 10)
+              .fill(Color.black.opacity(0.3))
+              .background(
+                RoundedRectangle(cornerRadius: 10)
+                  .fill(.ultraThinMaterial)
+              )
+              .frame(width: 54, height: 54)
+              .shadow(color: .black.opacity(0.4), radius: 10)
 
             if let lastPhoto = viewModel.session.capturedPhotos.last,
               let thumbnail = lastPhoto.image
@@ -283,59 +323,122 @@ struct CaptureFlowView: View {
               Image(uiImage: thumbnail)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .frame(width: 40, height: 40)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
+            // Badge with count
             Text("\(viewModel.session.capturedCount)")
-              .font(.caption2)
-              .fontWeight(.bold)
+              .font(.system(size: 11, weight: .bold))
               .foregroundColor(.white)
-              .padding(4)
-              .background(Color.red)
-              .clipShape(Circle())
-              .offset(x: 16, y: -16)
+              .padding(6)
+              .background(
+                Circle()
+                  .fill(
+                    LinearGradient(
+                      colors: [Color.red, Color.red.opacity(0.8)],
+                      startPoint: .top,
+                      endPoint: .bottom
+                    )
+                  )
+                  .shadow(color: .red.opacity(0.5), radius: 4)
+              )
+              .offset(x: 20, y: -20)
           }
-          .shadow(radius: 2)
         }
+        .transition(.scale.combined(with: .opacity))
       }
     }
     .padding(.horizontal, 20)
     .padding(.bottom, 10)
   }
+  
+  // MARK: - Angle Transition Helpers
+  
+  /// Angle transition'ı kapatmak için kontrol eder
+  /// Minimum 1sn bekler ve eğer sonraki açı yüz gerektiriyorsa yüz tespit edilmesini bekler
+  private func checkAngleTransitionDismiss() {
+    guard showingAngleTransition else { return }
+    
+    // Minimum 1 saniye geçmiş mi?
+    guard let startTime = angleTransitionStartTime,
+          Date().timeIntervalSince(startTime) >= 1.0 else {
+      // Henüz 1 saniye geçmemiş, 0.2 saniye sonra tekrar kontrol et
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        checkAngleTransitionDismiss()
+      }
+      return
+    }
+    
+    // Sonraki açı yüz gerektiriyor mu?
+    let nextAngle = viewModel.session.currentAngle
+    let requiresFaceDetection = nextAngle == .frontFace || 
+                                nextAngle == .rightProfile || 
+                                nextAngle == .leftProfile
+    
+    if requiresFaceDetection {
+      // Yüz tespit edildi mi?
+      let faceDetected = viewModel.faceTrackingService.isTracking && 
+                        viewModel.faceTrackingService.currentHeadPose != nil
+      
+      if !faceDetected {
+        // Henüz yüz tespit edilmemiş, 0.2 saniye sonra tekrar kontrol et
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+          checkAngleTransitionDismiss()
+        }
+        return
+      }
+    }
+    
+    // Her iki koşul da sağlandı - transition'ı kapat
+    withAnimation {
+      showingAngleTransition = false
+      angleTransitionStartTime = nil
+    }
+  }
 }
 
-/// Instructions view for current angle
+/// Instructions view for current angle with modern design
 struct AngleInstructionView: View {
   let angle: CaptureAngle
 
   var body: some View {
-    HStack(spacing: 12) {
-      // Icon
-      Image(systemName: angle.symbolName)
-        .font(.system(size: 24))
-        .foregroundColor(.white)
+    HStack(spacing: 14) {
+      // Icon with background
+      ZStack {
+        Circle()
+          .fill(Color.white.opacity(0.2))
+          .frame(width: 44, height: 44)
+        
+        Image(systemName: angle.symbolName)
+          .font(.system(size: 20, weight: .semibold))
+          .foregroundColor(.white)
+      }
 
-      VStack(alignment: .leading, spacing: 4) {
+      VStack(alignment: .leading, spacing: 5) {
         // Title
         Text(angle.title)
-          .font(.headline)
-          .fontWeight(.semibold)
+          .font(.system(size: 17, weight: .bold))
           .foregroundColor(.white)
 
         // Instructions (compact)
         Text(angle.instructions)
-          .font(.caption)
-          .foregroundColor(.white.opacity(0.8))
+          .font(.system(size: 13, weight: .medium))
+          .foregroundColor(.white.opacity(0.85))
           .lineLimit(2)
       }
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
+    .padding(.horizontal, 18)
+    .padding(.vertical, 14)
     .background(
       Capsule()
-        .fill(Color.black.opacity(0.6))
+        .fill(Color.black.opacity(0.4))
+        .background(
+          Capsule()
+            .fill(.ultraThinMaterial)
+        )
     )
+    .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
     .padding(.horizontal, 20)
     .fixedSize(horizontal: false, vertical: true)
   }
