@@ -319,6 +319,12 @@ class CameraService: NSObject, ObservableObject {
       device.whiteBalanceMode = .continuousAutoWhiteBalance
     }
 
+    // Enable low light boost for better quality in dark environments
+    if device.isLowLightBoostSupported {
+      device.automaticallyEnablesLowLightBoostWhenAvailable = true
+      print("📸 Low light boost enabled for better quality in dark conditions")
+    }
+
     // Set frame rate for better performance
     let desiredFrameRate = 30.0
     let formatDescription = device.activeFormat.formatDescription
@@ -445,35 +451,49 @@ class CameraService: NSObject, ObservableObject {
     print("📸 CameraService: Setting up photo capture...")
 
     return try await withCheckedThrowingContinuation { continuation in
-      // Configure photo settings for HEIC/HEVC with speed optimization
+      // Configure photo settings with proper HEIF format
       let settings: AVCapturePhotoSettings
       
-      // Use HEIC format (iOS 11+) for best quality and compression
+      // Use HEIF format (iOS 11+) for best quality and compression
+      // HEIF uses HEVC compression but is specifically for images
       if #available(iOS 11.0, *),
         photoOutput.availablePhotoCodecTypes.contains(.hevc)
       {
-        // Use HEVC codec for HEIC format (50% smaller than JPEG, better quality)
+        // Use HEVC codec for HEIF format (50% smaller than JPEG, better quality)
         settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-        print("📸 Using HEIC/HEVC format for capture")
+        print("📸 Using HEIF format with HEVC compression for capture")
       } else {
-        // Fallback to default format for older devices
+        // Fallback to JPEG format for older devices
         settings = AVCapturePhotoSettings()
-        print("⚠️ HEVC not available, using default format")
+        print("⚠️ HEIF not available, using JPEG format")
       }
       
-      // Configure settings
+      // Configure settings for maximum quality
       settings.flashMode = .auto  // Auto flash based on scene lighting
       settings.isHighResolutionPhotoEnabled = true
 
       // QUALITY prioritization for maximum quality (iOS 13+)
       if #available(iOS 13.0, *) {
         settings.photoQualityPrioritization = .quality  // Maximum quality!
-        print("📸 Using QUALITY prioritization with HEIC")
+        print("📸 Using QUALITY prioritization")
       }
 
       // Enable auto stabilization for better quality
       if #available(iOS 13.0, *) {
         settings.isAutoStillImageStabilizationEnabled = true
+        print("📸 Auto image stabilization enabled")
+      }
+      
+      // Enable depth data if available (for better portrait mode, etc.)
+      if photoOutput.isDepthDataDeliverySupported {
+        settings.isDepthDataDeliveryEnabled = false  // Disabled for faster capture
+      }
+      
+      // Enable portrait effects matte if available
+      if #available(iOS 12.0, *) {
+        if photoOutput.isPortraitEffectsMatteDeliverySupported {
+          settings.isPortraitEffectsMatteDeliveryEnabled = false  // Disabled for faster capture
+        }
       }
 
       print(
