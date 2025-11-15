@@ -408,7 +408,7 @@ struct SettingsView: View {
         Form {
           Section {
             Toggle("Debug Overlay", isOn: $debugMode)
-              .tint(.white)
+              .tint(Color(red: 0.0, green: 0.2, blue: 0.4))
           } header: {
             Text("Geliştirici Ayarları")
           } footer: {
