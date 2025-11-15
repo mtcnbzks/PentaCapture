@@ -26,6 +26,7 @@ class CaptureViewModel: ObservableObject {
   nonisolated(unsafe) let cameraService: CameraService
   nonisolated(unsafe) let audioService: AudioFeedbackService
   nonisolated(unsafe) let storageService: StorageService
+  nonisolated(unsafe) let sessionPersistenceService: SessionPersistenceService  // Auto-save/restore
   nonisolated(unsafe) let faceTrackingService: FaceTrackingService  // ARKit Face Tracking (TrueDepth only)
   nonisolated(unsafe) let motionService: MotionService  // CoreMotion for device orientation
 
@@ -44,15 +45,25 @@ class CaptureViewModel: ObservableObject {
     cameraService: CameraService = CameraService(),
     audioService: AudioFeedbackService = AudioFeedbackService(),
     storageService: StorageService = StorageService(),
+    sessionPersistenceService: SessionPersistenceService,
     faceTrackingService: FaceTrackingService = FaceTrackingService(),
-    motionService: MotionService = MotionService()
+    motionService: MotionService = MotionService(),
+    restoreSession: Bool = false
   ) {
     self.cameraService = cameraService
     self.audioService = audioService
     self.storageService = storageService
+    self.sessionPersistenceService = sessionPersistenceService
     self.faceTrackingService = faceTrackingService
     self.motionService = motionService
-    self.session = CaptureSession()
+    
+    // Restore saved session if requested
+    if restoreSession, let savedSession = sessionPersistenceService.loadSession() {
+      self.session = savedSession
+      print("✅ Restored session with \(savedSession.capturedCount) photos")
+    } else {
+      self.session = CaptureSession()
+    }
   }
 
   private func setupBindings() {
@@ -71,12 +82,43 @@ class CaptureViewModel: ObservableObject {
         }
       }
       .store(in: &cancellables)
+    
+    // Auto-save session when state changes (photos or angle)
+    // Combine both publishers to ensure we capture complete state
+    Publishers.CombineLatest(
+      session.$capturedPhotos,
+      session.$currentAngle
+    )
+    .dropFirst() // Skip initial values
+    .debounce(for: .seconds(0.5), scheduler: DispatchQueue.main)
+    .sink { [weak self] photos, currentAngle in
+      guard let self = self else { return }
+      
+      // Only save if we have photos (don't save empty sessions)
+      if !photos.isEmpty {
+        // Save session with current state (photos + current angle)
+        print("💾 Auto-saving session: \(photos.count) photos, next: \(currentAngle.title)")
+        self.sessionPersistenceService.saveSessionAsync(self.session)
+      }
+      // Note: We don't clear session when photos are empty
+      // User must explicitly choose "Start New" or "Clear Session"
+    }
+    .store(in: &cancellables)
 
     // Per Apple documentation: Handle app lifecycle to save battery
     NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
       .sink { [weak self] _ in
+        guard let self = self else { return }
         print("📱 App will resign active - pausing capture")
-        self?.pauseCapture()
+        
+        // Save session before going to background (even if complete)
+        if self.session.capturedCount > 0 {
+          print("💾 Saving session before background...")
+          // Use synchronous save for critical moment
+          self.sessionPersistenceService.saveSession(self.session)
+        }
+        
+        self.pauseCapture()
       }
       .store(in: &cancellables)
 
@@ -98,6 +140,10 @@ class CaptureViewModel: ObservableObject {
     if !storageService.isAuthorized {
       storageService.requestAuthorization()
     }
+
+    // Set default flash mode for current angle
+    cameraService.flashMode = FlashMode.defaultMode(for: session.currentAngle)
+    print("💡 Initial flash mode: \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)")
 
     // Start tracking time for first angle
     session.startAngleCapture(for: session.currentAngle)
@@ -694,13 +740,20 @@ class CaptureViewModel: ObservableObject {
           print("📸 Starting camera session for capture...")
           cameraService.startSession()
 
-          // Minimal wait for camera to warm up (speed optimized)
-          try await Task.sleep(nanoseconds: 200_000_000)  // 0.2 seconds (was 0.5)
+          // Wait for camera to fully warm up and stabilize
+          // Per Apple documentation: Ensure camera is ready before capture to prevent blur
+          try await Task.sleep(nanoseconds: 500_000_000)  // 0.5 seconds for stability
+          print("✅ Camera warmed up and ready")
         }
       }
+      
+      // Additional stabilization delay for sharpest image
+      // This ensures focus/exposure have settled
+      try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 second final stabilization
+      print("📸 Final stabilization complete")
 
-      print("📸 Calling cameraService.capturePhoto()...")
-      var image = try await cameraService.capturePhoto()
+      print("📸 Calling cameraService.capturePhoto() for \(session.currentAngle.title)...")
+      var image = try await cameraService.capturePhoto(forAngle: session.currentAngle)
       print("✅ Photo captured successfully! Image size: \(image.size)")
 
       // If we paused ARKit, stop camera and resume ARKit
@@ -747,6 +800,8 @@ class CaptureViewModel: ObservableObject {
       print(
         "✅ Photo added to session. Total photos: \(session.capturedPhotos.count)/\(CaptureAngle.allCases.count)"
       )
+      
+      // Note: Session auto-save is handled by Combine observer on session.$capturedPhotos
 
       // İlk 3 senaryo için daha hızlı success flash
       let isFastScenario = session.currentAngle == .frontFace || 
@@ -808,6 +863,10 @@ class CaptureViewModel: ObservableObject {
     currentValidation = nil
     validationStartTime = nil
     countdownValue = 3
+    
+    // Set default flash mode for this angle
+    cameraService.flashMode = FlashMode.defaultMode(for: session.currentAngle)
+    print("💡 Flash mode set to \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)")
   }
 
   func retakeCurrentAngle() {
@@ -823,6 +882,8 @@ class CaptureViewModel: ObservableObject {
     print("🔄 Retaking angle: \(angle.title)")
     session.retakeAngle(angle)
     resetValidationState()
+    
+    // Note: Session auto-save is handled by Combine observer on session.$capturedPhotos
 
     // Restart capture services if not already running
     // Check ARKit first (it handles camera), then fall back to camera session
@@ -838,6 +899,9 @@ class CaptureViewModel: ObservableObject {
   func resetSession() {
     session.reset()
     resetValidationState()
+    
+    // Clear auto-saved session when resetting
+    sessionPersistenceService.clearSession()
   }
 
   private func handleSessionComplete() async {
@@ -845,6 +909,10 @@ class CaptureViewModel: ObservableObject {
 
     // Stop all services
     stopCapture()
+    
+    // Note: We keep the saved session even when complete
+    // User can still review and might want to retake photos
+    // Session will only be cleared when user explicitly chooses "Start New"
 
     // No need to save locally - session is kept in memory
     // User will save to gallery from ReviewView if desired

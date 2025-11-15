@@ -60,6 +60,31 @@ enum CameraError: LocalizedError {
   }
 }
 
+/// Flash mode options
+enum FlashMode: String, CaseIterable {
+  case off = "Kapalı"
+  case auto = "Otomatik"
+  
+  var icon: String {
+    switch self {
+    case .off: return "bolt.slash.fill"
+    case .auto: return "bolt.badge.automatic.fill"
+    }
+  }
+  
+  var avFlashMode: AVCaptureDevice.FlashMode {
+    switch self {
+    case .off: return .off
+    case .auto: return .auto
+    }
+  }
+  
+  /// Default flash mode for all capture angles
+  static func defaultMode(for angle: CaptureAngle) -> FlashMode {
+    return .off  // All angles: flash off by default
+  }
+}
+
 /// Service responsible for managing camera operations
 @MainActor
 class CameraService: NSObject, ObservableObject {
@@ -68,6 +93,7 @@ class CameraService: NSObject, ObservableObject {
   @Published var isSessionRunning = false
   @Published var capturedImage: UIImage?
   @Published var error: CameraError?
+  @Published var flashMode: FlashMode = .off  // Default: flash off
 
   // MARK: - Internal Properties
   let captureSession = AVCaptureSession()
@@ -82,7 +108,7 @@ class CameraService: NSObject, ObservableObject {
 
   private var videoDataOutputDelegate: VideoDataOutputDelegate?
   private var photoCaptureDelegate: PhotoCaptureDelegate?
-  
+
   // Idle timer management - auto-enable after 2 minutes
   private var idleTimerTask: Task<Void, Never>?
 
@@ -253,13 +279,13 @@ class CameraService: NSObject, ObservableObject {
 
     captureSession.addOutput(photoOutput)
 
-    // Configure photo output for HEIC with maximum quality
+    // Configure photo output for JPEG with maximum quality
     photoOutput.isHighResolutionCaptureEnabled = true
 
     // QUALITY prioritization for maximum quality (iOS 13+)
     if #available(iOS 13.0, *) {
       photoOutput.maxPhotoQualityPrioritization = .quality  // Maximum quality!
-      print("📸 Photo output configured for QUALITY prioritization with HEIC support")
+      print("📸 Photo output configured for QUALITY prioritization with JPEG format")
     }
 
     // Enable video stabilization for better quality
@@ -270,7 +296,7 @@ class CameraService: NSObject, ObservableObject {
       }
     }
 
-    print("📸 Available photo codecs: \(photoOutput.availablePhotoCodecTypes.map { $0.rawValue })")
+    print("📸 Using JPEG format - Available codecs: \(photoOutput.availablePhotoCodecTypes.map { $0.rawValue })")
 
     // Setup video data output for frame processing
     guard captureSession.canAddOutput(videoDataOutput) else {
@@ -442,34 +468,43 @@ class CameraService: NSObject, ObservableObject {
   }
 
   // MARK: - Photo Capture
-  func capturePhoto() async throws -> UIImage {
+  func capturePhoto(forAngle angle: CaptureAngle? = nil) async throws -> UIImage {
     guard captureSession.isRunning else {
       print("❌ Capture session not running")
       throw CameraError.captureSessionNotRunning
     }
 
     print("📸 CameraService: Setting up photo capture...")
+    
+    // Lock focus and exposure for sharpest image
+    // Per Apple documentation: Lock focus before capture to prevent blur
+    if let device = videoDeviceInput?.device {
+      try? device.lockForConfiguration()
+      if device.isFocusModeSupported(.locked) {
+        device.focusMode = .locked
+        print("🔒 Focus locked for capture")
+      }
+      if device.isExposureModeSupported(.locked) {
+        device.exposureMode = .locked
+        print("🔒 Exposure locked for capture")
+      }
+      device.unlockForConfiguration()
+    }
 
     return try await withCheckedThrowingContinuation { continuation in
-      // Configure photo settings with proper HEIF format
-      let settings: AVCapturePhotoSettings
+      // Configure photo settings for JPEG format
+      // Per Apple documentation: Default AVCapturePhotoSettings() uses JPEG format
+      let settings = AVCapturePhotoSettings()
+      print("📸 Using JPEG format for capture")
       
-      // Use HEIF format (iOS 11+) for best quality and compression
-      // HEIF uses HEVC compression but is specifically for images
-      if #available(iOS 11.0, *),
-        photoOutput.availablePhotoCodecTypes.contains(.hevc)
-      {
-        // Use HEVC codec for HEIF format (50% smaller than JPEG, better quality)
-        settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-        print("📸 Using HEIF format with HEVC compression for capture")
-      } else {
-        // Fallback to JPEG format for older devices
-        settings = AVCapturePhotoSettings()
-        print("⚠️ HEIF not available, using JPEG format")
+      // Configure flash mode - respect user's selection
+      // User can toggle between .off and .auto
+      settings.flashMode = flashMode.avFlashMode
+      
+      if let angle = angle {
+        print("💡 Flash mode for \(angle.title): \(flashMode.rawValue)")
       }
       
-      // Configure settings for maximum quality
-      settings.flashMode = .auto  // Auto flash based on scene lighting
       settings.isHighResolutionPhotoEnabled = true
 
       // QUALITY prioritization for maximum quality (iOS 13+)
@@ -503,6 +538,20 @@ class CameraService: NSObject, ObservableObject {
       // CRITICAL: Store delegate as instance variable to prevent garbage collection
       self.photoCaptureDelegate = PhotoCaptureDelegate { [weak self] result in
         print("📸 CameraService: Photo capture delegate callback received")
+        
+        // Re-enable continuous auto focus/exposure after capture
+        if let device = self?.videoDeviceInput?.device {
+          try? device.lockForConfiguration()
+          if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+          }
+          if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+          }
+          device.unlockForConfiguration()
+          print("🔓 Focus/Exposure unlocked after capture")
+        }
+        
         continuation.resume(with: result)
         // Clear the delegate after use to free memory
         self?.photoCaptureDelegate = nil

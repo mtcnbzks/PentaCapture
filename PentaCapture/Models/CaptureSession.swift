@@ -279,6 +279,23 @@ class CaptureSession: ObservableObject {
       angleStats[angle] = AngleCaptureStats(angle: angle)
     }
   }
+  
+  /// Initialize with saved session data (for restore)
+  init(
+    sessionId: UUID,
+    startTime: Date,
+    currentAngle: CaptureAngle,
+    capturedPhotos: [CapturedPhoto],
+    isComplete: Bool,
+    angleStats: [CaptureAngle: AngleCaptureStats]
+  ) {
+    self.sessionId = sessionId
+    self.startTime = startTime
+    self.currentAngle = currentAngle
+    self.capturedPhotos = capturedPhotos
+    self.isComplete = isComplete
+    self.angleStats = angleStats
+  }
 
   /// Add a captured photo to the session
   func addPhoto(_ photo: CapturedPhoto) {

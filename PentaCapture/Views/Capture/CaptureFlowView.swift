@@ -279,78 +279,94 @@ struct CaptureFlowView: View {
 
   private var bottomControls: some View {
     HStack(spacing: 30) {
-      // Skip/Previous button with modern styling
-      if viewModel.session.currentAngle.rawValue > 0 {
-        Button(action: {
-          viewModel.goToPreviousAngle()
-        }) {
-          Image(systemName: "chevron.left.circle.fill")
-            .font(.system(size: 44))
-            .foregroundColor(.white)
-            .background(
-              Circle()
-                .fill(Color.black.opacity(0.3))
-                .frame(width: 50, height: 50)
-            )
-            .shadow(color: .black.opacity(0.3), radius: 8)
+      // Skip/Previous button with modern styling (with placeholder to maintain layout)
+      Group {
+        if viewModel.session.currentAngle.rawValue > 0 {
+          Button(action: {
+            viewModel.goToPreviousAngle()
+          }) {
+            Image(systemName: "chevron.left.circle.fill")
+              .font(.system(size: 44))
+              .foregroundColor(.white)
+              .background(
+                Circle()
+                  .fill(Color.black.opacity(0.3))
+                  .frame(width: 50, height: 50)
+              )
+              .shadow(color: .black.opacity(0.3), radius: 8)
+          }
+          .transition(.scale.combined(with: .opacity))
+        } else {
+          // Invisible placeholder to maintain flash button center alignment
+          Color.clear
+            .frame(width: 54, height: 54)
         }
-        .transition(.scale.combined(with: .opacity))
       }
 
       Spacer()
 
+      // Flash control button - center bottom
+      FlashControlButton(cameraService: viewModel.cameraService)
+        .transition(.scale.combined(with: .opacity))
+
       Spacer()
 
-      // Review button with modern styling
-      if !viewModel.session.capturedPhotos.isEmpty {
-        Button(action: {
-          showingReview = true
-        }) {
-          ZStack {
-            // Background with glassmorphism
-            RoundedRectangle(cornerRadius: 10)
-              .fill(Color.black.opacity(0.3))
-              .background(
-                RoundedRectangle(cornerRadius: 10)
-                  .fill(.ultraThinMaterial)
-              )
-              .frame(width: 54, height: 54)
-              .shadow(color: .black.opacity(0.4), radius: 10)
+      // Review button with modern styling (with placeholder to maintain layout)
+      Group {
+        if !viewModel.session.capturedPhotos.isEmpty {
+          Button(action: {
+            showingReview = true
+          }) {
+            ZStack {
+              // Background with glassmorphism
+              RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.3))
+                .background(
+                  RoundedRectangle(cornerRadius: 10)
+                    .fill(.ultraThinMaterial)
+                )
+                .frame(width: 54, height: 54)
+                .shadow(color: .black.opacity(0.4), radius: 10)
 
-            if let lastPhoto = viewModel.session.capturedPhotos.last,
-              let thumbnail = lastPhoto.image
-            {
-              Image(uiImage: thumbnail)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 50, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
+              if let lastPhoto = viewModel.session.capturedPhotos.last,
+                let thumbnail = lastPhoto.image
+              {
+                Image(uiImage: thumbnail)
+                  .resizable()
+                  .aspectRatio(contentMode: .fill)
+                  .frame(width: 50, height: 50)
+                  .clipShape(RoundedRectangle(cornerRadius: 8))
+              }
 
-            // Badge with count
-            Text("\(viewModel.session.capturedCount)")
-              .font(.system(size: 11, weight: .bold))
-              .foregroundColor(.white)
-              .padding(6)
-              .background(
-                Circle()
-                  .fill(
-                    LinearGradient(
-                      colors: [Color.red, Color.red.opacity(0.8)],
-                      startPoint: .top,
-                      endPoint: .bottom
+              // Badge with count
+              Text("\(viewModel.session.capturedCount)")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.white)
+                .padding(6)
+                .background(
+                  Circle()
+                    .fill(
+                      LinearGradient(
+                        colors: [Color.red, Color.red.opacity(0.8)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                      )
                     )
-                  )
-                  .shadow(color: .red.opacity(0.5), radius: 4)
-              )
-              .offset(x: 20, y: -20)
+                    .shadow(color: .red.opacity(0.5), radius: 4)
+                )
+                .offset(x: 20, y: -20)
+            }
           }
+          .transition(.scale.combined(with: .opacity))
+        } else {
+          // Invisible placeholder to maintain flash button center alignment
+          Color.clear
+            .frame(width: 54, height: 54)
         }
-        .transition(.scale.combined(with: .opacity))
       }
     }
     .padding(.horizontal, 20)
-    .padding(.bottom, 10)
+    .padding(.bottom, 30)
   }
   
   // MARK: - Angle Transition Helpers
@@ -512,6 +528,54 @@ struct PoseValueRow: View {
         .font(.system(size: 11, weight: .bold, design: .monospaced))
         .foregroundColor(color)
         .frame(width: 60, alignment: .trailing)
+    }
+  }
+}
+
+/// Flash control button with cycle through modes
+struct FlashControlButton: View {
+  @ObservedObject var cameraService: CameraService
+
+  var body: some View {
+    Button(action: {
+      // Toggle between off and auto: off <-> auto
+      withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        switch cameraService.flashMode {
+        case .off:
+          cameraService.flashMode = .auto
+        case .auto:
+          cameraService.flashMode = .off
+        }
+      }
+    }) {
+      VStack(spacing: 4) {
+        Image(systemName: cameraService.flashMode.icon)
+          .font(.system(size: 24, weight: .semibold))
+          .foregroundColor(flashColor)
+
+        Text(cameraService.flashMode.rawValue)
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundColor(.white.opacity(0.9))
+      }
+      .frame(width: 60, height: 60)
+      .background(
+        RoundedRectangle(cornerRadius: 12)
+          .fill(Color.black.opacity(0.4))
+          .background(
+            RoundedRectangle(cornerRadius: 12)
+              .fill(.ultraThinMaterial)
+          )
+      )
+      .shadow(color: .black.opacity(0.3), radius: 8)
+    }
+  }
+
+  private var flashColor: Color {
+    switch cameraService.flashMode {
+    case .off:
+      return .white.opacity(0.6)
+    case .auto:
+      return .white
     }
   }
 }

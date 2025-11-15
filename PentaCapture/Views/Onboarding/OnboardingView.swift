@@ -15,6 +15,7 @@ struct OnboardingView: View {
   @State private var cameraPermissionGranted = false
   @State private var photoLibraryPermissionGranted = false
   let onComplete: () -> Void
+  let onSkip: (() -> Void)?
 
   private let pages = [
     OnboardingPage(
@@ -66,7 +67,11 @@ struct OnboardingView: View {
         HStack {
           Spacer()
           Button("Geç") {
-            onComplete()
+            if let onSkip = onSkip {
+              onSkip()
+            } else {
+              onComplete()
+            }
           }
           .font(.subheadline)
           .fontWeight(.medium)
@@ -116,24 +121,30 @@ struct OnboardingView: View {
 
         // Navigation buttons
         HStack(spacing: 16) {
-          // Back button (hidden on first page)
-          if currentPage > 0 {
-            Button(action: {
-              withAnimation {
-                currentPage -= 1
+          // Back button (with placeholder on first page to maintain layout)
+          Group {
+            if currentPage > 0 {
+              Button(action: {
+                withAnimation {
+                  currentPage -= 1
+                }
+              }) {
+                HStack(spacing: 8) {
+                  Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                  Text("Geri")
+                    .font(.headline)
+                }
+                .foregroundColor(.white.opacity(0.8))
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.white.opacity(0.15))
+                .cornerRadius(16)
               }
-            }) {
-              HStack(spacing: 8) {
-                Image(systemName: "chevron.left")
-                  .font(.system(size: 16, weight: .semibold))
-                Text("Geri")
-                  .font(.headline)
-              }
-              .foregroundColor(.white.opacity(0.8))
-              .frame(maxWidth: .infinity)
-              .padding()
-              .background(Color.white.opacity(0.15))
-              .cornerRadius(16)
+            } else {
+              // Invisible placeholder to maintain button layout
+              Color.clear
+                .frame(maxWidth: .infinity)
             }
           }
 
@@ -163,7 +174,7 @@ struct OnboardingView: View {
           }
         }
         .padding(.horizontal, 30)
-        .padding(.bottom, 30)
+        .padding(.bottom, 40)
       }
     }
     .onAppear {
