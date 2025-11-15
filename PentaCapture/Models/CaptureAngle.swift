@@ -58,7 +58,7 @@ enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
     switch self {
     case .frontFace, .rightProfile, .leftProfile: return 15.0  // Reasonably strict for face views
     case .vertex: return 20.0  // Moderate tolerance for top view
-    case .donorArea: return 30.0  // Very flexible for back/nape view - hard to hold steady
+    case .donorArea: return 40.0  // Very flexible for back/nape view - accepts both upright (127°) and upside-down (165°) positions
     }
   }
   
