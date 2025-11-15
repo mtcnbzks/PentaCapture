@@ -154,12 +154,12 @@ class AudioFeedbackService: ObservableObject {
       }
 
     case .captured:
-      // AVCapturePhotoOutput automatically plays shutter sound
-      // We only add haptic feedback here to avoid double sound
-      // Note: Shutter sound cannot be disabled in Japan due to legal requirements
-      notificationHaptic.notificationOccurred(.success)
-      notificationHaptic.prepare()
-      print("📸 Photo captured - haptic feedback only (AVCapturePhotoOutput handles sound)")
+      // AVCapturePhotoOutput automatically plays shutter sound (when not in silent mode)
+      // However, when phone is in silent mode, no sound plays
+      // Provide strong haptic feedback (3x) to ensure user always gets feedback
+      // Note: When sound plays, user gets both sound and haptic - even better feedback!
+      print("📸 Photo captured - strong haptic feedback (3x)")
+      playTripleHapticFeedback()
 
     case .error:
       playSystemSound(.error)
@@ -331,6 +331,29 @@ class AudioFeedbackService: ObservableObject {
     if !isEnabled {
       stopProximityFeedback()
       stopEngine()
+    }
+  }
+
+  // MARK: - Haptic Helpers
+
+  /// Play triple haptic feedback for photo capture
+  /// Provides strong haptic feedback (3x) in sequence to ensure feedback in all modes
+  /// Especially important when phone is in silent mode and shutter sound doesn't play
+  private func playTripleHapticFeedback() {
+    // First impact - heavy
+    heavyHaptic.impactOccurred(intensity: 1.0)
+    heavyHaptic.prepare()
+
+    // Second impact after 80ms
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+      self?.heavyHaptic.impactOccurred(intensity: 1.0)
+      self?.heavyHaptic.prepare()
+    }
+
+    // Third impact after 160ms
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self] in
+      self?.heavyHaptic.impactOccurred(intensity: 1.0)
+      self?.heavyHaptic.prepare()
     }
   }
 
