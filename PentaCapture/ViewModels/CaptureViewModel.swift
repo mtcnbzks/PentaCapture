@@ -909,13 +909,13 @@ class CaptureViewModel: ObservableObject {
 
     // Stop all services
     stopCapture()
-    
+
     // Note: We keep the saved session even when complete
     // User can still review and might want to retake photos
     // Session will only be cleared when user explicitly chooses "Start New"
 
-    // No need to save locally - session is kept in memory
-    // User will save to gallery from ReviewView if desired
+    // Save the complete session so metadata is updated
+    sessionPersistenceService.saveSessionAsync(session)
 
     print("✅ Session complete and ready for review")
   }

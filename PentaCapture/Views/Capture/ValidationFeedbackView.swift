@@ -105,6 +105,11 @@ struct ValidationMetricsView: View {
         yawError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
 
       HStack(spacing: 12) {
+        // Face tracking icon - minimal
+        Image(systemName: "face.smiling")
+          .font(.system(size: 18, weight: .medium))
+          .foregroundColor(.white.opacity(0.5))
+
         // Direction arrow (if needed) - modern icon
         if currentYaw < -5 {
           Image(systemName: "arrow.left.circle.fill")
@@ -115,7 +120,7 @@ struct ValidationMetricsView: View {
             .font(.system(size: 24))
             .foregroundColor(.white.opacity(0.8))
         }
-        
+
         // Large current angle value with gradient
         Text(String(format: "%.0f°", abs(currentYaw)))
           .font(.system(size: 40, weight: .bold, design: .rounded))

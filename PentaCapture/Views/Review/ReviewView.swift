@@ -118,123 +118,151 @@ struct ReviewView: View {
   }
 
   private var headerView: some View {
-    VStack(spacing: 8) {
-      HStack {
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Fotoğraflarınızı İnceleyin")
-            .font(.title2)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
+    HStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 3) {
+        Text("Fotoğraflarınız")
+          .font(.system(size: 20, weight: .semibold, design: .rounded))
+          .foregroundColor(.white)
 
-          Text("\(session.capturedCount)/\(session.totalCount) fotoğraf çekildi")
-            .font(.subheadline)
-            .foregroundColor(.white.opacity(0.8))
+        Text("\(session.capturedCount)/\(session.totalCount) fotoğraf")
+          .font(.system(size: 14, weight: .regular))
+          .foregroundColor(.white.opacity(0.6))
+      }
+
+      Spacer()
+
+      // Layout toggle buttons - minimal
+      HStack(spacing: 8) {
+        // Grid layout toggle
+        Button(action: {
+          withAnimation(.easeInOut(duration: 0.2)) {
+            showProfessionalGrid.toggle()
+          }
+        }) {
+          Image(systemName: showProfessionalGrid ? "square.grid.2x2.fill" : "square.grid.2x2")
+            .font(.system(size: 18, weight: .medium))
+            .foregroundColor(.white.opacity(showProfessionalGrid ? 0.9 : 0.5))
+            .frame(width: 40, height: 40)
+            .background(
+              Circle()
+                .fill(showProfessionalGrid ? Color.white.opacity(0.1) : Color.clear)
+            )
         }
 
-        Spacer()
-
-        // Layout toggle buttons
-        HStack(spacing: 12) {
-          // Grid layout toggle
-          Button(action: {
-            withAnimation {
-              showProfessionalGrid.toggle()
-            }
-          }) {
-            Image(systemName: showProfessionalGrid ? "square.grid.2x2.fill" : "square.grid.2x2")
-              .font(.title3)
-              .foregroundColor(.white.opacity(showProfessionalGrid ? 1.0 : 0.6))
+        // Heat map toggle
+        Button(action: {
+          withAnimation(.easeInOut(duration: 0.2)) {
+            showHeatMap.toggle()
           }
-
-          // Heat map toggle
-          Button(action: {
-            withAnimation {
-              showHeatMap.toggle()
-            }
-          }) {
-            Image(systemName: showHeatMap ? "chart.bar.fill" : "chart.bar")
-              .font(.title3)
-              .foregroundColor(.white.opacity(showHeatMap ? 1.0 : 0.6))
-          }
+        }) {
+          Image(systemName: showHeatMap ? "chart.bar.fill" : "chart.bar")
+            .font(.system(size: 18, weight: .medium))
+            .foregroundColor(.white.opacity(showHeatMap ? 0.9 : 0.5))
+            .frame(width: 40, height: 40)
+            .background(
+              Circle()
+                .fill(showHeatMap ? Color.white.opacity(0.1) : Color.clear)
+            )
         }
       }
     }
-    .padding()
+    .padding(.horizontal, 16)
+    .padding(.vertical, 14)
     .frame(maxWidth: .infinity)
-    .background(Color.black.opacity(0.3))
+    .background(Color.black.opacity(0.2))
   }
 
   private var actionButtons: some View {
-    VStack(spacing: 12) {
-      // Save to gallery button
+    VStack(spacing: 10) {
+      // Save to gallery button - primary
       Button(action: {
         saveToGallery()
       }) {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
           if isSaving {
             ProgressView()
-              .tint(.white)
+              .controlSize(.small)
+              .tint(Color(red: 0.1, green: 0.1, blue: 0.15))
           } else {
             Image(systemName: "square.and.arrow.down")
-              .font(.system(size: 22))
+              .font(.system(size: 15, weight: .medium))
             Text("Galeriye Kaydet")
-              .font(.system(size: 18))
-              .fontWeight(.semibold)
+              .font(.system(size: 15, weight: .semibold))
           }
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .background(session.capturedCount > 0 ? Color.green : Color.green.opacity(0.5))
-        .foregroundColor(.white)
+        .padding(.vertical, 14)
+        .background(
+          session.capturedCount > 0
+            ? Color.white : Color.white.opacity(0.3)
+        )
+        .foregroundColor(
+          session.capturedCount > 0
+            ? Color(red: 0.1, green: 0.1, blue: 0.15) : Color.white.opacity(0.5)
+        )
         .cornerRadius(12)
       }
       .disabled(isSaving || session.capturedCount == 0)
 
-      // Share button
-      Button(action: {
-        showingShareSheet = true
-      }) {
-        HStack(spacing: 10) {
-          Image(systemName: "square.and.arrow.up")
-            .font(.system(size: 22))
-          Text("Paylaş")
-            .font(.system(size: 18))
-            .fontWeight(.semibold)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(session.capturedCount > 0 ? Color.blue : Color.blue.opacity(0.5))
-        .foregroundColor(.white)
-        .cornerRadius(12)
-      }
-      .disabled(session.capturedCount == 0)
-
-      // Export JSON (for ML/Backend)
-      Button(action: {
-        exportSessionJSON()
-      }) {
-        HStack(spacing: 10) {
-          if isExportingJSON {
-            ProgressView()
-              .tint(.white)
-          } else {
-            Image(systemName: "doc.text")
-              .font(.system(size: 22))
-            Text("JSON Export (ML)")
-              .font(.system(size: 18))
-              .fontWeight(.semibold)
+      HStack(spacing: 10) {
+        // Share button
+        Button(action: {
+          showingShareSheet = true
+        }) {
+          HStack(spacing: 6) {
+            Image(systemName: "square.and.arrow.up")
+              .font(.system(size: 14, weight: .medium))
+            Text("Paylaş")
+              .font(.system(size: 14, weight: .medium))
           }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 12)
+          .background(
+            session.capturedCount > 0
+              ? Color.white.opacity(0.15) : Color.white.opacity(0.05)
+          )
+          .foregroundColor(
+            session.capturedCount > 0
+              ? .white.opacity(0.9) : .white.opacity(0.4)
+          )
+          .cornerRadius(10)
         }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(session.capturedCount > 0 ? Color.purple : Color.purple.opacity(0.5))
-        .foregroundColor(.white)
-        .cornerRadius(12)
+        .disabled(session.capturedCount == 0)
+
+        // Export JSON (for ML/Backend)
+        Button(action: {
+          exportSessionJSON()
+        }) {
+          HStack(spacing: 6) {
+            if isExportingJSON {
+              ProgressView()
+                .controlSize(.small)
+                .tint(.white)
+            } else {
+              Image(systemName: "doc.text")
+                .font(.system(size: 14, weight: .medium))
+              Text("JSON")
+                .font(.system(size: 14, weight: .medium))
+            }
+          }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 12)
+          .background(
+            session.capturedCount > 0
+              ? Color.white.opacity(0.15) : Color.white.opacity(0.05)
+          )
+          .foregroundColor(
+            session.capturedCount > 0
+              ? .white.opacity(0.9) : .white.opacity(0.4)
+          )
+          .cornerRadius(10)
+        }
+        .disabled(session.capturedCount == 0 || isExportingJSON)
       }
-      .disabled(session.capturedCount == 0 || isExportingJSON)
     }
-    .padding()
-    .background(Color.black.opacity(0.6))
+    .padding(.horizontal, 16)
+    .padding(.vertical, 14)
+    .background(Color.black.opacity(0.4))
   }
 
   private func saveToGallery() {

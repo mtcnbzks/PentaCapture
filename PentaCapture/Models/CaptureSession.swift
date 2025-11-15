@@ -314,6 +314,8 @@ class CaptureSession: ObservableObject {
     } else {
       print("✅ All angles captured! Session complete.")
       isComplete = true
+      // Force UI update
+      objectWillChange.send()
     }
   }
 

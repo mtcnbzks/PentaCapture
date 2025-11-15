@@ -425,7 +425,7 @@ struct AngleInstructionView: View {
         Circle()
           .fill(Color.white.opacity(0.2))
           .frame(width: 44, height: 44)
-        
+
         Image(systemName: angle.symbolName)
           .font(.system(size: 20, weight: .semibold))
           .foregroundColor(.white)

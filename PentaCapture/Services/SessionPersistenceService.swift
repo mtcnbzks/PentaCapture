@@ -183,12 +183,13 @@ class SessionPersistenceService: ObservableObject {
     
     do {
       let metadata = try decoder.decode(SessionMetadata.self, from: metadataData)
-      // Only return if session is not complete and not too old (e.g., within 7 days)
+      // Keep session if it's recent (within 7 days) - even if complete
+      // User can review complete sessions, retake photos, or export
       let daysSinceLastSave = Date().timeIntervalSince(metadata.lastSavedTime) / 86400
-      if !metadata.isComplete && daysSinceLastSave < 7 {
+      if daysSinceLastSave < 7 {
         return metadata
       } else {
-        // Clean up old/completed session
+        // Clean up old sessions (older than 7 days)
         clearSession()
         return nil
       }

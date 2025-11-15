@@ -20,9 +20,9 @@ struct OnboardingView: View {
   private let pages = [
     OnboardingPage(
       icon: "camera.fill",
-      title: "5 Açıdan Fotoğraf",
+      title: "5 Farklı Açı",
       description:
-        "Saç analizi için 5 farklı açıdan fotoğraf çekeceğiz. Uygulama sizi adım adım yönlendirecek.",
+        "Başınızın her tarafını görmek için 5 açıdan fotoğraf çekeceğiz.",
       color: .blue,
       needsCameraPermission: true
     ),
@@ -30,23 +30,23 @@ struct OnboardingView: View {
       icon: "hand.raised.fill",
       title: "Otomatik Çekim",
       description:
-        "Telefonu doğru pozisyona getirdiğinizde fotoğraf otomatik olarak çekilir.",
+        "Doğru pozisyona geldiğinizde fotoğraf kendiliğinden çekilir.",
       color: .green,
       needsCameraPermission: false
     ),
     OnboardingPage(
       icon: "figure.stand",
-      title: "Pozisyon Kılavuzu",
+      title: "Kolay Kılavuz",
       description:
-        "Ekrandaki görsel kılavuzlar ve sesli geri bildirimler doğru pozisyonu bulmanıza yardımcı olacak.",
+        "Ekrandaki görseller ve sesli yönlendirme size yardımcı olur.",
       color: .orange,
       needsCameraPermission: false
     ),
     OnboardingPage(
       icon: "checkmark.seal.fill",
-      title: "Kaliteli Görüntü",
+      title: "Net Fotoğraf",
       description:
-        "Net ve tutarlı fotoğraflar için aydınlık bir ortamda çekim yapın ve telefonu sabit tutun.",
+        "Aydınlık bir yerde durun ve telefonu sabit tutun.",
       color: .purple,
       needsCameraPermission: false,
       needsPhotoLibraryPermission: true
@@ -55,15 +55,16 @@ struct OnboardingView: View {
 
   var body: some View {
     ZStack {
+      // Minimal gradient background
       LinearGradient(
-        colors: [Color.black, Color(white: 0.15)],
+        colors: [Color.black, Color(white: 0.1)],
         startPoint: .top,
         endPoint: .bottom
       )
       .ignoresSafeArea()
 
-      VStack(spacing: 40) {
-        // Skip button
+      VStack(spacing: 0) {
+        // Skip button - minimal
         HStack {
           Spacer()
           Button("Geç") {
@@ -73,39 +74,20 @@ struct OnboardingView: View {
               onComplete()
             }
           }
-          .font(.subheadline)
-          .fontWeight(.medium)
-          .foregroundColor(.white.opacity(0.9))
-          .padding(.horizontal, 20)
-          .padding(.vertical, 10)
+          .font(.system(size: 15, weight: .medium))
+          .foregroundColor(.white.opacity(0.7))
+          .padding(.horizontal, 16)
+          .padding(.vertical, 8)
           .background(
-            ZStack {
-              // Liquid glass effect
-              RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.1))
-
-              RoundedRectangle(cornerRadius: 20)
-                .fill(
-                  LinearGradient(
-                    colors: [
-                      Color.white.opacity(0.15),
-                      Color.white.opacity(0.05),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                  )
-                )
-
-              RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-            }
+            RoundedRectangle(cornerRadius: 12)
+              .fill(Color.white.opacity(0.1))
           )
-          .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-          .padding(.trailing, 20)
-          .padding(.top, 10)
         }
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
 
-        // Page view
+        // Page view with fixed height to prevent scrolling issues
         TabView(selection: $currentPage) {
           ForEach(0..<pages.count, id: \.self) { index in
             OnboardingPageView(
@@ -119,61 +101,65 @@ struct OnboardingView: View {
         .tabViewStyle(.page(indexDisplayMode: .always))
         .indexViewStyle(.page(backgroundDisplayMode: .always))
 
-        // Navigation buttons
-        HStack(spacing: 16) {
-          // Back button (with placeholder on first page to maintain layout)
-          Group {
-            if currentPage > 0 {
-              Button(action: {
-                withAnimation {
-                  currentPage -= 1
-                }
-              }) {
-                HStack(spacing: 8) {
-                  Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                  Text("Geri")
-                    .font(.headline)
-                }
-                .foregroundColor(.white.opacity(0.8))
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.white.opacity(0.15))
-                .cornerRadius(16)
+        // Navigation buttons - minimal
+        HStack(spacing: 12) {
+          // Back button
+          if currentPage > 0 {
+            Button(action: {
+              withAnimation(.easeInOut(duration: 0.3)) {
+                currentPage -= 1
               }
-            } else {
-              // Invisible placeholder to maintain button layout
-              Color.clear
-                .frame(maxWidth: .infinity)
+            }) {
+              HStack(spacing: 6) {
+                Image(systemName: "chevron.left")
+                  .font(.system(size: 14, weight: .semibold))
+                Text("Geri")
+                  .font(.system(size: 16, weight: .medium))
+              }
+              .foregroundColor(.white.opacity(0.8))
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 16)
+              .background(
+                RoundedRectangle(cornerRadius: 14)
+                  .fill(Color.white.opacity(0.1))
+              )
             }
           }
 
           // Next/Start button
           Button(action: {
             if currentPage < pages.count - 1 {
-              withAnimation {
+              withAnimation(.easeInOut(duration: 0.3)) {
                 currentPage += 1
               }
             } else {
               onComplete()
             }
           }) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
               Text(currentPage < pages.count - 1 ? "Devam" : "Başlayalım")
-                .font(.headline)
+                .font(.system(size: 16, weight: .semibold))
               if currentPage < pages.count - 1 {
                 Image(systemName: "chevron.right")
-                  .font(.system(size: 16, weight: .semibold))
+                  .font(.system(size: 14, weight: .semibold))
               }
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.blue)
-            .cornerRadius(16)
+            .padding(.vertical, 16)
+            .background(
+              RoundedRectangle(cornerRadius: 14)
+                .fill(
+                  LinearGradient(
+                    colors: [Color.blue, Color.blue.opacity(0.8)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                  )
+                )
+            )
           }
         }
-        .padding(.horizontal, 30)
+        .padding(.horizontal, 24)
         .padding(.bottom, 40)
       }
     }
@@ -210,66 +196,71 @@ struct OnboardingPageView: View {
   @Binding var photoLibraryPermissionGranted: Bool
 
   var body: some View {
-    VStack(spacing: 30) {
-      // Icon
+    VStack(spacing: 0) {
+      Spacer()
+        .frame(height: 40)
+
+      // Icon - minimal
       ZStack {
         Circle()
-          .fill(page.color.opacity(0.2))
-          .frame(width: 200, height: 200)
-
-        Circle()
-          .fill(page.color.opacity(0.4))
-          .frame(width: 160, height: 160)
+          .fill(page.color.opacity(0.15))
+          .frame(width: 90, height: 90)
 
         Image(systemName: page.icon)
-          .font(.system(size: 80))
+          .font(.system(size: 40, weight: .light))
           .foregroundColor(page.color)
       }
+      .padding(.bottom, 28)
 
       // Title
       Text(page.title)
-        .font(.title)
-        .fontWeight(.bold)
+        .font(.system(size: 26, weight: .bold, design: .rounded))
         .foregroundColor(.white)
         .multilineTextAlignment(.center)
+        .padding(.bottom, 12)
 
       // Description
       Text(page.description)
-        .font(.body)
-        .foregroundColor(.white.opacity(0.8))
+        .font(.system(size: 16, weight: .regular))
+        .foregroundColor(.white.opacity(0.7))
         .multilineTextAlignment(.center)
-        .padding(.horizontal, 40)
+        .lineSpacing(4)
+        .padding(.horizontal, 32)
+        .fixedSize(horizontal: false, vertical: true)
 
-      // Permission buttons
-      if page.needsCameraPermission {
-        PermissionButton(
-          title: "Kamera Erişimi",
-          icon: "camera.fill",
-          isGranted: cameraPermissionGranted,
-          action: {
-            requestCameraPermission { granted in
-              cameraPermissionGranted = granted
+      // Permission buttons area - fixed height to maintain consistency
+      VStack(spacing: 10) {
+        if page.needsCameraPermission {
+          PermissionButton(
+            title: "Kamera Erişimi",
+            icon: "camera.fill",
+            isGranted: cameraPermissionGranted,
+            action: {
+              requestCameraPermission { granted in
+                cameraPermissionGranted = granted
+              }
             }
-          }
-        )
-        .padding(.horizontal, 40)
-        .padding(.top, 20)
-      }
+          )
+        }
 
-      if page.needsPhotoLibraryPermission {
-        PermissionButton(
-          title: "Galeri Erişimi",
-          icon: "photo.fill",
-          isGranted: photoLibraryPermissionGranted,
-          action: {
-            requestPhotoLibraryPermission { granted in
-              photoLibraryPermissionGranted = granted
+        if page.needsPhotoLibraryPermission {
+          PermissionButton(
+            title: "Galeri Erişimi",
+            icon: "photo.fill",
+            isGranted: photoLibraryPermissionGranted,
+            action: {
+              requestPhotoLibraryPermission { granted in
+                photoLibraryPermissionGranted = granted
+              }
             }
-          }
-        )
-        .padding(.horizontal, 40)
-        .padding(.top, 20)
+          )
+        }
       }
+      .frame(height: 100) // Fixed height for permission area
+      .padding(.horizontal, 32)
+      .padding(.top, 24)
+
+      Spacer()
     }
   }
 
@@ -290,7 +281,7 @@ struct OnboardingPageView: View {
   }
 }
 
-/// Permission button component
+/// Permission button component - minimal design
 struct PermissionButton: View {
   let title: String
   let icon: String
@@ -301,33 +292,35 @@ struct PermissionButton: View {
     Button(action: action) {
       HStack(spacing: 12) {
         Image(systemName: icon)
-          .font(.system(size: 20))
-          .foregroundColor(isGranted ? .green : .white)
+          .font(.system(size: 18, weight: .medium))
+          .foregroundColor(isGranted ? .green : .white.opacity(0.9))
+          .frame(width: 24)
 
         Text(title)
-          .font(.headline)
-          .foregroundColor(isGranted ? .green : .white)
+          .font(.system(size: 16, weight: .medium))
+          .foregroundColor(isGranted ? .green : .white.opacity(0.9))
 
         Spacer()
 
         if isGranted {
           Image(systemName: "checkmark.circle.fill")
-            .font(.system(size: 24))
+            .font(.system(size: 20))
             .foregroundColor(.green)
         } else {
-          Image(systemName: "arrow.right.circle")
-            .font(.system(size: 24))
-            .foregroundColor(.white.opacity(0.6))
+          Image(systemName: "chevron.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.white.opacity(0.4))
         }
       }
-      .padding()
+      .padding(.horizontal, 16)
+      .padding(.vertical, 14)
       .background(
         RoundedRectangle(cornerRadius: 12)
-          .fill(isGranted ? Color.green.opacity(0.2) : Color.white.opacity(0.1))
+          .fill(isGranted ? Color.green.opacity(0.15) : Color.white.opacity(0.08))
       )
       .overlay(
         RoundedRectangle(cornerRadius: 12)
-          .stroke(isGranted ? Color.green : Color.white.opacity(0.3), lineWidth: 2)
+          .stroke(isGranted ? Color.green.opacity(0.5) : Color.white.opacity(0.15), lineWidth: 1)
       )
     }
     .disabled(isGranted)
