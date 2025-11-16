@@ -266,6 +266,27 @@ struct ReviewView: View {
   }
 
   private func saveToGallery() {
+    // Check if we need to request permission first
+    if !storageService.isAuthorized {
+      // Request permission - this is the first time user tries to save
+      storageService.requestAuthorization()
+      
+      // Wait a bit for permission dialog and check again
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        if storageService.isAuthorized {
+          performSave()
+        } else {
+          // Permission denied or still pending - user will see error alert from StorageService
+          print("⚠️ Gallery permission not granted")
+        }
+      }
+    } else {
+      // Already authorized, proceed with save
+      performSave()
+    }
+  }
+  
+  private func performSave() {
     isSaving = true
 
     Task {
@@ -274,11 +295,13 @@ struct ReviewView: View {
         await MainActor.run {
           isSaving = false
           showingSaveConfirmation = true
+          onSaveToGallery()  // Notify parent
         }
       } catch {
         await MainActor.run {
           isSaving = false
-          // Show error
+          // Error will be shown via StorageService.error
+          print("❌ Failed to save to gallery: \(error.localizedDescription)")
         }
       }
     }

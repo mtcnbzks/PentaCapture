@@ -136,10 +136,8 @@ class CaptureViewModel: ObservableObject {
     
     setupBindings()
 
-    // Request authorizations if needed
-    if !storageService.isAuthorized {
-      storageService.requestAuthorization()
-    }
+    // Note: Gallery permission will be requested only when user tries to save photos
+    // This prevents unnecessary permission dialogs at app launch
 
     // Set default flash mode for current angle
     cameraService.flashMode = FlashMode.defaultMode(for: session.currentAngle)
