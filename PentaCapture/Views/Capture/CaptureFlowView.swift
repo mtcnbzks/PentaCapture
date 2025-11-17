@@ -76,7 +76,7 @@ struct CaptureFlowView: View {
           ProximityIndicator(progress: validation.progress)
             .transition(.scale.combined(with: .opacity))
           Spacer()
-            .frame(height: 200) // Space for bottom controls
+            .frame(height: 100) // Space for bottom controls
         }
       }
       
