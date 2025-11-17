@@ -5,7 +5,7 @@
 //  Created by Mehmetcan Bozkuş on 9.11.2025.
 //
 
-import AVFoundation
+internal import AVFoundation
 import SwiftUI
 
 /// UIViewRepresentable wrapper for AVCaptureVideoPreviewLayer

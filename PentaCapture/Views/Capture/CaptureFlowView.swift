@@ -14,11 +14,31 @@ struct CaptureFlowView: View {
   @State private var showingInstructions = true
   @State private var showingAngleTransition = false
   @State private var angleTransitionStartTime: Date?
+  @State private var showingVideoInstruction = false
+  @State private var currentVideoFileName: String?
+  @State private var shownVideoAngles: Set<CaptureAngle> = []  // Track which angles have shown videos
   @AppStorage("debugMode") private var debugMode = false
   @Environment(\.dismiss) var dismiss
 
   var body: some View {
     ZStack {
+      // Video instruction overlay (shown before specific angles)
+      if showingVideoInstruction, let videoFileName = currentVideoFileName {
+        VideoInstructionView(videoFileName: videoFileName) {
+          // When video completes or is skipped
+          withAnimation {
+            showingVideoInstruction = false
+            currentVideoFileName = nil
+          }
+          
+          // Resume capture after video
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            viewModel.resumeCapture()
+          }
+        }
+        .zIndex(100)  // Ensure video is on top
+      }
+      
       // Camera preview
       if viewModel.faceTrackingService.isSupported {
         // Use ARKit camera feed when face tracking is available
@@ -117,9 +137,15 @@ struct CaptureFlowView: View {
       }
     }
     .onAppear {
-      // Small delay to ensure services and permissions are ready
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+      // CRITICAL: Longer delay to ensure camera permissions are fully granted
+      // This is especially important when user just granted permission in onboarding
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
         viewModel.startCapture()
+        
+        // After starting capture, check if we need to show video for current angle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+          checkAndShowVideoIfNeeded(for: viewModel.session.currentAngle)
+        }
       }
     }
     .onDisappear {
@@ -189,15 +215,18 @@ struct CaptureFlowView: View {
     .onChange(of: viewModel.session.capturedCount) { newCount in
       // Show quick angle indicator when a photo is captured (except when session is complete)
       if newCount > 0 && !viewModel.session.isComplete {
-        // Show transition
-        withAnimation {
-          showingAngleTransition = true
-          angleTransitionStartTime = Date()
-        }
-        
-        // Start checking for face detection (if needed for next angle)
-        checkAngleTransitionDismiss()
+        // Check if we need to show video instruction for next angle
+        checkAndShowVideoIfNeeded(for: viewModel.session.currentAngle)
       }
+    }
+    .onChange(of: viewModel.session.currentAngle) { newAngle in
+      // When angle changes (e.g., retake, session restored), check if we need to show video
+      checkAndShowVideoIfNeeded(for: newAngle)
+    }
+    .onChange(of: viewModel.session.sessionId) { _ in
+      // Session was reset - clear shown video tracking
+      print("🔄 Session reset detected - clearing video tracking")
+      shownVideoAngles.removeAll()
     }
     .onChange(of: viewModel.faceTrackingService.isTracking) { _ in
       // Yüz tespit durumu değiştiğinde transition'ı kontrol et
@@ -370,6 +399,57 @@ struct CaptureFlowView: View {
   }
   
   // MARK: - Angle Transition Helpers
+  
+  /// Returns the video file name for a given angle, or nil if no video is needed
+  private func videoFileNameForAngle(_ angle: CaptureAngle) -> String? {
+    switch angle {
+    case .vertex:
+      return "KısaMOV.mov"
+    case .donorArea:
+      return "Uzun.mov"
+    default:
+      return nil
+    }
+  }
+  
+  /// Check if video instruction is needed for this angle and show it if not already shown
+  private func checkAndShowVideoIfNeeded(for angle: CaptureAngle) {
+    // Check if this angle needs a video
+    guard let videoFileName = videoFileNameForAngle(angle) else {
+      // No video needed, show normal transition
+      if !showingVideoInstruction && !viewModel.session.isComplete {
+        withAnimation {
+          showingAngleTransition = true
+          angleTransitionStartTime = Date()
+        }
+        checkAngleTransitionDismiss()
+      }
+      return
+    }
+    
+    // Check if we already showed video for this angle
+    if shownVideoAngles.contains(angle) {
+      print("📹 Video already shown for \(angle.title), skipping")
+      return
+    }
+    
+    // Show video instruction
+    print("📹 Showing video instruction for \(angle.title): \(videoFileName)")
+    
+    // Mark as shown
+    shownVideoAngles.insert(angle)
+    
+    // Pause capture while showing video
+    viewModel.pauseCapture()
+    
+    // Show video after a brief delay
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+      withAnimation {
+        currentVideoFileName = videoFileName
+        showingVideoInstruction = true
+      }
+    }
+  }
   
   /// Angle transition'ı kapatmak için kontrol eder
   /// Minimum 1sn bekler ve eğer sonraki açı yüz gerektiriyorsa yüz tespit edilmesini bekler

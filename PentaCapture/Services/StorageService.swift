@@ -61,7 +61,8 @@ class StorageService: ObservableObject {
     case .authorized, .limited:
       isAuthorized = true
     case .notDetermined:
-      requestAuthorization()
+      // DON'T request automatically - only request when user explicitly tries to save
+      isAuthorized = false
     case .denied, .restricted:
       isAuthorized = false
       error = .unauthorized

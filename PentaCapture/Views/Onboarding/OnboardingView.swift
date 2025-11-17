@@ -5,7 +5,7 @@
 //  Created by Mehmetcan Bozkuş on 9.11.2025.
 //
 
-import AVFoundation
+internal import AVFoundation
 import Photos
 import SwiftUI
 
@@ -49,7 +49,7 @@ struct OnboardingView: View {
         "Aydınlık bir yerde durun ve telefonu sabit tutun.",
       color: .purple,
       needsCameraPermission: false,
-      needsPhotoLibraryPermission: true
+      needsPhotoLibraryPermission: false  // Galeri izni artık isteğe bağlı - galeriye kaydet butonuna basıldığında istenecek
     ),
   ]
 
@@ -151,13 +151,14 @@ struct OnboardingView: View {
               RoundedRectangle(cornerRadius: 14)
                 .fill(
                   LinearGradient(
-                    colors: [Color.blue, Color.blue.opacity(0.8)],
+                    colors: isNextButtonEnabled ? [Color.blue, Color.blue.opacity(0.8)] : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                   )
                 )
             )
           }
+          .disabled(!isNextButtonEnabled)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
@@ -176,6 +177,21 @@ struct OnboardingView: View {
     // Check photo library permission
     let photoStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
     photoLibraryPermissionGranted = (photoStatus == .authorized || photoStatus == .limited)
+  }
+  
+  // Check if next/start button should be enabled
+  private var isNextButtonEnabled: Bool {
+    let currentPageData = pages[currentPage]
+    
+    // If current page needs camera permission, require it
+    if currentPageData.needsCameraPermission && !cameraPermissionGranted {
+      return false
+    }
+    
+    // Photo library permission is optional - don't block user
+    // They can grant it later when saving to gallery
+    
+    return true
   }
 }
 

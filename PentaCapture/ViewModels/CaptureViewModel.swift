@@ -9,6 +9,7 @@ import Combine
 import Foundation
 import SwiftUI
 import UIKit
+internal import AVFoundation
 
 /// Main coordinator for the capture process
 @MainActor
@@ -134,74 +135,82 @@ class CaptureViewModel: ObservableObject {
   func startCapture() {
     print("🎬 Starting capture session...")
     
-    setupBindings()
-
-    // Request authorizations if needed
-    if !storageService.isAuthorized {
-      storageService.requestAuthorization()
-    }
-
-    // Set default flash mode for current angle
-    cameraService.flashMode = FlashMode.defaultMode(for: session.currentAngle)
-    print("💡 Initial flash mode: \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)")
-
-    // Start tracking time for first angle
-    session.startAngleCapture(for: session.currentAngle)
-
-    // Start services
-    audioService.startProximityFeedback()
-
-    // Start CoreMotion for device orientation tracking
-    if motionService.isAvailable {
-      motionService.startTracking()
-      print("✅ CoreMotion tracking started")
-    } else {
-      print("⚠️ CoreMotion not available on this device")
-    }
-
-    // Start ARKit Face Tracking (REQUIRED - TrueDepth only)
-    // ARKit provides its own camera feed, no need for separate AVCaptureSession
-    if faceTrackingService.isSupported {
-      print("🚀 Starting ARKit-based capture (ARKit provides camera feed)")
+    // CRITICAL: Recheck camera authorization before starting
+    // This ensures we have the latest authorization status
+    Task {
+      await cameraService.recheckAuthorization()
       
-      // Small delay to ensure camera permission is fully granted
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-        guard let self = self else { return }
-        
-        self.faceTrackingService.startTracking()
-        
-        // Setup camera for photo capture but DON'T start session yet
-        // We'll start it only when capturing to avoid conflict with ARKit
-        if self.cameraService.isAuthorized {
-          print("📸 Configuring camera for photo capture (will start only during capture)")
-          self.cameraService.setupCaptureSession()
-          // DON'T start the session here - ARKit is using the camera
+      await MainActor.run {
+        setupBindings()
+
+        // Note: Gallery permission will be requested only when user tries to save photos
+        // This prevents unnecessary permission dialogs at app launch
+
+        // Set default flash mode for current angle
+        cameraService.flashMode = FlashMode.defaultMode(for: session.currentAngle)
+        print("💡 Initial flash mode: \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)")
+
+        // Start tracking time for first angle
+        session.startAngleCapture(for: session.currentAngle)
+
+        // Start services
+        audioService.startProximityFeedback()
+
+        // Start CoreMotion for device orientation tracking
+        if motionService.isAvailable {
+          motionService.startTracking()
+          print("✅ CoreMotion tracking started")
         } else {
-          print("⚠️ Camera not authorized yet, will setup when authorized")
+          print("⚠️ CoreMotion not available on this device")
         }
-        
-        print("✅ ARKit Face Tracking enabled (TrueDepth device)")
-      }
-    } else {
-      print(
-        "❌ ARKit Face Tracking not available - app requires TrueDepth camera (iPhone X or later)")
-      // Fallback: Use regular camera without ARKit
-      if !cameraService.isSessionRunning {
-        if cameraService.isAuthorized {
-          cameraService.setupCaptureSession()
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.cameraService.startSession()
+
+        // Start ARKit Face Tracking (REQUIRED - TrueDepth only)
+        // ARKit provides its own camera feed, no need for separate AVCaptureSession
+        if faceTrackingService.isSupported {
+          print("🚀 Starting ARKit-based capture (ARKit provides camera feed)")
+          
+          // Small delay to ensure camera permission is fully granted
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            
+            self.faceTrackingService.startTracking()
+            
+            // Setup camera for photo capture but DON'T start session yet
+            // We'll start it only when capturing to avoid conflict with ARKit
+            if self.cameraService.isAuthorized {
+              print("📸 Configuring camera for photo capture (will start only during capture)")
+              self.cameraService.setupCaptureSession()
+              // DON'T start the session here - ARKit is using the camera
+            } else {
+              print("⚠️ Camera not authorized yet, cannot setup camera")
+              self.errorMessage = "Kamera izni gerekli. Lütfen Ayarlar'dan kamera erişimine izin verin."
+            }
+            
+            print("✅ ARKit Face Tracking enabled (TrueDepth device)")
           }
         } else {
-          print("⚠️ Camera not authorized, waiting for permission...")
+          print(
+            "❌ ARKit Face Tracking not available - app requires TrueDepth camera (iPhone X or later)")
+          // Fallback: Use regular camera without ARKit
+          if !cameraService.isSessionRunning {
+            if cameraService.isAuthorized {
+              cameraService.setupCaptureSession()
+              DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.cameraService.startSession()
+              }
+            } else {
+              print("⚠️ Camera not authorized, cannot start camera")
+              errorMessage = "Kamera izni gerekli. Lütfen Ayarlar'dan kamera erişimine izin verin."
+            }
+          } else {
+            cameraService.startSession()
+          }
         }
-      } else {
-        cameraService.startSession()
+
+        // Reset for current angle
+        resetValidationState()
       }
     }
-
-    // Reset for current angle
-    resetValidationState()
   }
 
   func stopCapture() {
@@ -735,8 +744,23 @@ class CaptureViewModel: ObservableObject {
         print("⏸️ Pausing ARKit to capture photo...")
         faceTrackingService.stopTracking()
 
+        // CRITICAL: Ensure camera is authorized before attempting to use it
+        guard cameraService.isAuthorized else {
+          print("❌ Cannot capture photo: camera not authorized")
+          throw CameraError.unauthorized
+        }
+
         // Start camera session for capture
         if !cameraService.isSessionRunning {
+          // CRITICAL: Setup camera session if not already setup
+          // This is important when permission was just granted
+          if cameraService.captureSession.inputs.isEmpty {
+            print("📸 Setting up camera session (not previously configured)...")
+            cameraService.setupCaptureSession()
+            // Wait a bit for setup to complete
+            try await Task.sleep(nanoseconds: 300_000_000)  // 0.3 seconds
+          }
+          
           print("📸 Starting camera session for capture...")
           cameraService.startSession()
 
