@@ -404,9 +404,9 @@ struct CaptureFlowView: View {
   private func videoFileNameForAngle(_ angle: CaptureAngle) -> String? {
     switch angle {
     case .vertex:
-      return "KısaMOV.mov"
+      return "instruction_short.mov"
     case .donorArea:
-      return "Uzun.mov"
+      return "instruction_long.mov"
     default:
       return nil
     }
