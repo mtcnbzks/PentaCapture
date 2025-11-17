@@ -5,7 +5,7 @@
 //  Created by Mehmetcan Bozkuş on 9.11.2025.
 //
 
-import AVFoundation
+internal import AVFoundation
 import Combine
 import UIKit
 
@@ -119,9 +119,14 @@ class CameraService: NSObject, ObservableObject {
   override nonisolated init() {
     super.init()
     Task { @MainActor in
-      self.checkAuthorization()
+      await self.checkAuthorization()
       self.setupNotifications()
     }
+  }
+  
+  // Public method to re-check authorization (useful after user grants permission)
+  func recheckAuthorization() async {
+    await checkAuthorization()
   }
 
   deinit {
@@ -190,24 +195,29 @@ class CameraService: NSObject, ObservableObject {
 
   // MARK: - Authorization
   @MainActor
-  private func checkAuthorization() {
+  private func checkAuthorization() async {
     switch AVCaptureDevice.authorizationStatus(for: .video) {
     case .authorized:
+      print("📹 Camera authorization: Authorized")
       isAuthorized = true
       // Don't auto-setup session - let caller control when to setup
       // setupCaptureSession()
     case .notDetermined:
-      AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-        Task { @MainActor in
-          self?.isAuthorized = granted
-          // Don't auto-setup after authorization
-          // Camera session will be manually set up when needed
-        }
+      print("📹 Camera authorization: Not determined, requesting...")
+      let granted = await AVCaptureDevice.requestAccess(for: .video)
+      print("📹 Camera authorization request result: \(granted)")
+      isAuthorized = granted
+      if !granted {
+        error = .unauthorized
       }
+      // Don't auto-setup after authorization
+      // Camera session will be manually set up when needed
     case .denied, .restricted:
+      print("📹 Camera authorization: Denied/Restricted")
       isAuthorized = false
       error = .unauthorized
     @unknown default:
+      print("📹 Camera authorization: Unknown status")
       isAuthorized = false
     }
   }

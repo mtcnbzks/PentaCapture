@@ -137,9 +137,15 @@ struct CaptureFlowView: View {
       }
     }
     .onAppear {
-      // Small delay to ensure services and permissions are ready
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+      // CRITICAL: Longer delay to ensure camera permissions are fully granted
+      // This is especially important when user just granted permission in onboarding
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
         viewModel.startCapture()
+        
+        // After starting capture, check if we need to show video for current angle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+          checkAndShowVideoIfNeeded(for: viewModel.session.currentAngle)
+        }
       }
     }
     .onDisappear {
@@ -193,12 +199,6 @@ struct CaptureFlowView: View {
         // Ensure camera is fully stopped when review appears
         print("📱 Review opened - stopping all camera services")
         viewModel.stopCapture()
-      }
-    }
-    .onAppear {
-      // When view first appears (including restored sessions), check if we need to show video
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-        checkAndShowVideoIfNeeded(for: viewModel.session.currentAngle)
       }
     }
     .onChange(of: viewModel.session.isComplete) { isComplete in
