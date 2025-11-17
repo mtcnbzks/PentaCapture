@@ -294,6 +294,20 @@ class CameraService: NSObject, ObservableObject {
       captureSession.commitConfiguration()
       print("📝 Camera configuration committed")
     }
+    
+    // Log device information for debugging
+    print("📱 Device Info:")
+    print("   Model: \(UIDevice.current.model)")
+    print("   System: \(UIDevice.current.systemName) \(UIDevice.current.systemVersion)")
+    
+    var systemInfo = utsname()
+    uname(&systemInfo)
+    let deviceIdentifier = withUnsafePointer(to: &systemInfo.machine) {
+      $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+        String(validatingUTF8: $0) ?? "Unknown"
+      }
+    }
+    print("   Device ID: \(deviceIdentifier)")
 
     // Setup video input
     guard
@@ -302,6 +316,8 @@ class CameraService: NSObject, ObservableObject {
     else {
       throw CameraError.noCameraAvailable
     }
+    
+    print("📸 Camera Device: \(videoDevice.localizedName)")
 
     let videoDeviceInput = try AVCaptureDeviceInput(device: videoDevice)
 
@@ -335,34 +351,43 @@ class CameraService: NSObject, ObservableObject {
       print("📸 Photo output configured for QUALITY prioritization")
     }
     
-    // Enable Zero Shutter Lag (iOS 17+)
-    // Per Apple WWDC 2023: Zero Shutter Lag reduces capture latency significantly
+    // Enable iOS 17+ Performance Features
+    // Per Apple WWDC 2023: These features significantly improve capture performance
     if #available(iOS 17.0, *) {
+      print("📸 iOS 17+ Performance Features:")
+      
+      // Zero Shutter Lag (iPhone 11 Pro and newer)
+      // Per Apple WWDC 2023: Reduces capture latency significantly
       if photoOutput.isZeroShutterLagSupported {
         photoOutput.isZeroShutterLagEnabled = true
-        print("📸 Zero Shutter Lag ENABLED - reduces capture latency")
+        print("   ✅ Zero Shutter Lag: ENABLED")
       } else {
-        print("⚠️ Zero Shutter Lag not supported on this device")
+        print("   ❌ Zero Shutter Lag: NOT SUPPORTED (requires iPhone 11 Pro or newer)")
       }
       
-      // Enable Responsive Capture (iOS 17+)
+      // Responsive Capture (A12 Bionic and newer)
       // Per Apple WWDC 2023: Allows overlapping captures for faster shot-to-shot times
       // Note: Requires Zero Shutter Lag to be enabled
       if photoOutput.isResponsiveCaptureSupported && photoOutput.isZeroShutterLagEnabled {
         photoOutput.isResponsiveCaptureEnabled = true
-        print("📸 Responsive Capture ENABLED - faster shot-to-shot times")
+        print("   ✅ Responsive Capture: ENABLED")
+      } else if !photoOutput.isResponsiveCaptureSupported {
+        print("   ❌ Responsive Capture: NOT SUPPORTED (requires A12 Bionic or newer)")
       } else {
-        print("⚠️ Responsive Capture not supported (requires Zero Shutter Lag)")
+        print("   ⚠️ Responsive Capture: DISABLED (requires Zero Shutter Lag)")
       }
       
-      // Enable Fast Capture Prioritization (iOS 17+)
+      // Fast Capture Prioritization (A12 Bionic and newer)
       // Per Apple WWDC 2023: Adapts quality dynamically for consistent shot-to-shot times
       if photoOutput.isFastCapturePrioritizationSupported {
         photoOutput.isFastCapturePrioritizationEnabled = true
-        print("📸 Fast Capture Prioritization ENABLED - maintains shot-to-shot consistency")
+        print("   ✅ Fast Capture Prioritization: ENABLED")
       } else {
-        print("⚠️ Fast Capture Prioritization not supported")
+        print("   ❌ Fast Capture Prioritization: NOT SUPPORTED (requires A12 Bionic or newer)")
       }
+    } else {
+      print("📸 Running on iOS < 17: Performance features not available")
+      print("   ℹ️  To get best performance, update to iOS 17 or later")
     }
 
     // Enable video stabilization for better quality
@@ -415,6 +440,7 @@ class CameraService: NSObject, ObservableObject {
 
   /// Select the optimal camera format for highest quality photo capture
   /// Per Apple WWDC 2023: Choose format based on resolution, codec, and quality support
+  /// Implements robust fallback strategy for older devices (iPhone 11, etc.)
   private func selectOptimalFormat(for device: AVCaptureDevice) throws {
     try device.lockForConfiguration()
     defer { device.unlockForConfiguration() }
@@ -422,30 +448,47 @@ class CameraService: NSObject, ObservableObject {
     let formats = device.formats
     print("📸 Evaluating \(formats.count) available formats...")
     
-    // Find formats that support highest photo quality
+    // Strategy 1: Find formats that support highest photo quality (iOS 13.0+)
     // Per Apple documentation: Look for isHighestPhotoQualitySupported
     let highQualityFormats = formats.filter { format in
-      // We want formats that support high photo quality
       format.isHighestPhotoQualitySupported
     }
     
     print("📸 Found \(highQualityFormats.count) high quality formats")
     
-    // Among high quality formats, select the one with highest resolution
-    // Per Apple: Higher resolution = better quality for photos
-    let sortedFormats = highQualityFormats.sorted { format1, format2 in
-      let dims1 = CMVideoFormatDescriptionGetDimensions(format1.formatDescription)
-      let dims2 = CMVideoFormatDescriptionGetDimensions(format2.formatDescription)
-      let pixels1 = dims1.width * dims1.height
-      let pixels2 = dims2.width * dims2.height
-      return pixels1 > pixels2
+    // Try to select from high quality formats first
+    var selectedFormat: AVCaptureDevice.Format?
+    
+    if !highQualityFormats.isEmpty {
+      // Among high quality formats, select the one with highest resolution
+      let sortedFormats = highQualityFormats.sorted { format1, format2 in
+        let dims1 = CMVideoFormatDescriptionGetDimensions(format1.formatDescription)
+        let dims2 = CMVideoFormatDescriptionGetDimensions(format2.formatDescription)
+        let pixels1 = dims1.width * dims1.height
+        let pixels2 = dims2.width * dims2.height
+        return pixels1 > pixels2
+      }
+      selectedFormat = sortedFormats.first
+      print("✅ Strategy 1 (High Quality): Selected format")
+    } else {
+      // Strategy 2: FALLBACK for older devices - select highest resolution format
+      print("⚠️ No high quality format found, falling back to highest resolution format")
+      let sortedAllFormats = formats.sorted { format1, format2 in
+        let dims1 = CMVideoFormatDescriptionGetDimensions(format1.formatDescription)
+        let dims2 = CMVideoFormatDescriptionGetDimensions(format2.formatDescription)
+        let pixels1 = dims1.width * dims1.height
+        let pixels2 = dims2.width * dims2.height
+        return pixels1 > pixels2
+      }
+      selectedFormat = sortedAllFormats.first
+      print("✅ Strategy 2 (Fallback): Selected highest resolution format")
     }
     
-    // Select the best format
-    if let bestFormat = sortedFormats.first {
+    // Apply the selected format
+    if let bestFormat = selectedFormat {
       device.activeFormat = bestFormat
       let dims = CMVideoFormatDescriptionGetDimensions(bestFormat.formatDescription)
-      print("📸 Selected optimal format: \(dims.width)x\(dims.height)")
+      print("📸 Selected format: \(dims.width)x\(dims.height)")
       print("   - Highest photo quality supported: \(bestFormat.isHighestPhotoQualitySupported)")
       
       // Log supported frame rates for this format
@@ -453,8 +496,11 @@ class CameraService: NSObject, ObservableObject {
         print("   - Frame rate range: \(frameRateRange.minFrameRate)-\(frameRateRange.maxFrameRate) fps")
       }
     } else {
-      // Fallback to default format if no high quality format found
-      print("⚠️ No high quality format found, using device default format")
+      // Strategy 3: Ultimate fallback - keep device default format
+      // This should never happen, but defensive programming
+      print("⚠️ Could not select custom format, using device default")
+      let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+      print("📸 Using default format: \(dims.width)x\(dims.height)")
     }
   }
   
