@@ -11,6 +11,7 @@ import SwiftUI
 struct ProgressIndicatorView: View {
   let currentAngle: CaptureAngle
   let capturedAngles: Set<CaptureAngle>
+  var onAngleTap: ((CaptureAngle) -> Void)?
 
   var body: some View {
     HStack(spacing: 10) {
@@ -20,6 +21,9 @@ struct ProgressIndicatorView: View {
           isCurrent: angle == currentAngle,
           isCaptured: capturedAngles.contains(angle)
         )
+        .onTapGesture {
+          onAngleTap?(angle)
+        }
       }
     }
     .padding(.horizontal, 16)

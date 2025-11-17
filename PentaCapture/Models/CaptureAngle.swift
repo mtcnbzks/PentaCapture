@@ -36,9 +36,9 @@ enum CaptureAngle: Int, CaseIterable, Identifiable, Codable {
     case .leftProfile:
       return "Başınızı 45° sola çevirin"
     case .vertex:
-      return "Telefonu başınızın tam üstünde tutun, tepe bölgesini merkeze alın"
+      return "Telefonu tepe bölgesine tutun"
     case .donorArea:
-      return "Telefonu ense bölgenize tutun, saç çizgisini merkeze alın"
+      return "Telefonu ense bölgesine tutun"
     }
   }
 

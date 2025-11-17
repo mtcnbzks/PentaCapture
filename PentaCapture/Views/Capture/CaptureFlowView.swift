@@ -50,13 +50,11 @@ struct CaptureFlowView: View {
           .ignoresSafeArea()
       }
 
-      // Overlay UI
-      VStack(spacing: 0) {
-        // Top bar
+      // Top bar overlay
+      VStack {
         topBar
-          .padding(.top, 8)
           .frame(maxWidth: .infinity)
-
+        
         // Instructions for current angle - positioned near top
         if showingInstructions && !viewModel.isCountingDown {
           AngleInstructionView(angle: viewModel.session.currentAngle)
@@ -64,35 +62,30 @@ struct CaptureFlowView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 12)
         }
-
+        
         Spacer()
-
-        // Validation feedback with Proximity Indicator
-        if let validation = viewModel.currentValidation,
-          !viewModel.isCountingDown && !viewModel.showSuccess
-        {
-          VStack(spacing: 16) {
-            // Large Proximity Indicator (Brief's key requirement)
-            if validation.progress > 0.3 {
-              ProximityIndicator(progress: validation.progress)
-                .transition(.scale.combined(with: .opacity))
-            }
-
-            // Detailed validation feedback
-            ValidationFeedbackView(validation: validation)
-              .transition(.move(edge: .bottom).combined(with: .opacity))
-          }
+      }
+      
+      // Center proximity indicator overlay
+      if let validation = viewModel.currentValidation,
+        !viewModel.isCountingDown && !viewModel.showSuccess,
+        validation.progress > 0.3
+      {
+        VStack {
+          Spacer()
+          ProximityIndicator(progress: validation.progress)
+            .transition(.scale.combined(with: .opacity))
+          Spacer()
+            .frame(height: 200) // Space for bottom controls
+        }
+      }
+      
+      // Bottom controls overlay (hidden during countdown)
+      VStack {
+        Spacer()
+        bottomControls
           .frame(maxWidth: .infinity)
-          .padding(.horizontal, 20)
-          .padding(.bottom, 20)
-        }
-
-        // Bottom controls (hidden during countdown)
-        if !viewModel.isCountingDown {
-          bottomControls
-            .frame(maxWidth: .infinity)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
+          .opacity(viewModel.isCountingDown ? 0 : 1)
       }
 
       // Minimal center crosshair only (no big rectangle)
@@ -252,7 +245,7 @@ struct CaptureFlowView: View {
   }
 
   private var topBar: some View {
-    HStack {
+    HStack(spacing: 0) {
       // Close button with modern styling
       Button(action: {
         dismiss()
@@ -271,13 +264,17 @@ struct CaptureFlowView: View {
           )
           .shadow(color: .black.opacity(0.3), radius: 8)
       }
+      .padding(.leading, 8)
 
       Spacer()
 
-      // Progress indicator (already modernized)
+      // Progress indicator (already modernized) - now tappable to switch angles
       ProgressIndicatorView(
         currentAngle: viewModel.session.currentAngle,
-        capturedAngles: Set(viewModel.session.capturedPhotos.map { $0.angle })
+        capturedAngles: Set(viewModel.session.capturedPhotos.map { $0.angle }),
+        onAngleTap: { angle in
+          viewModel.goToAngle(angle)
+        }
       )
 
       Spacer()
@@ -302,45 +299,15 @@ struct CaptureFlowView: View {
           )
           .shadow(color: .black.opacity(0.3), radius: 8)
       }
+      .padding(.trailing, 8)
     }
-    .padding()
+    .padding(.horizontal, 56)
+    .padding(.top, 32)
   }
 
   private var bottomControls: some View {
-    HStack(spacing: 30) {
-      // Skip/Previous button with modern styling (with placeholder to maintain layout)
-      Group {
-        if viewModel.session.currentAngle.rawValue > 0 {
-          Button(action: {
-            viewModel.goToPreviousAngle()
-          }) {
-            Image(systemName: "chevron.left.circle.fill")
-              .font(.system(size: 44))
-              .foregroundColor(.white)
-              .background(
-                Circle()
-                  .fill(Color.black.opacity(0.3))
-                  .frame(width: 50, height: 50)
-              )
-              .shadow(color: .black.opacity(0.3), radius: 8)
-          }
-          .transition(.scale.combined(with: .opacity))
-        } else {
-          // Invisible placeholder to maintain flash button center alignment
-          Color.clear
-            .frame(width: 54, height: 54)
-        }
-      }
-
-      Spacer()
-
-      // Flash control button - center bottom
-      FlashControlButton(cameraService: viewModel.cameraService)
-        .transition(.scale.combined(with: .opacity))
-
-      Spacer()
-
-      // Review button with modern styling (with placeholder to maintain layout)
+    HStack(spacing: 0) {
+      // Gallery/Review button - left side
       Group {
         if !viewModel.session.capturedPhotos.isEmpty {
           Button(action: {
@@ -386,16 +353,39 @@ struct CaptureFlowView: View {
                 .offset(x: 20, y: -20)
             }
           }
+          .padding(.leading, 8)
           .transition(.scale.combined(with: .opacity))
         } else {
-          // Invisible placeholder to maintain flash button center alignment
+          // Invisible placeholder
           Color.clear
             .frame(width: 54, height: 54)
+            .padding(.leading, 8)
         }
       }
+
+      Spacer()
+
+      // Validation feedback - center (moved from top, compact version for bottom controls)
+      // Fixed size to prevent layout shifts
+      if let validation = viewModel.currentValidation,
+         !viewModel.isCountingDown && !viewModel.showSuccess {
+        ValidationFeedbackView(validation: validation)
+          .transition(.opacity)
+          .frame(width: 180, height: 50)
+      } else {
+        Color.clear
+          .frame(width: 180, height: 50)
+      }
+
+      Spacer()
+
+      // Flash control button - right side
+      FlashControlButton(cameraService: viewModel.cameraService)
+        .padding(.trailing, 8)
+        .transition(.scale.combined(with: .opacity))
     }
-    .padding(.horizontal, 20)
-    .padding(.bottom, 30)
+    .padding(.horizontal, 56)
+    .padding(.bottom, 80)
   }
   
   // MARK: - Angle Transition Helpers

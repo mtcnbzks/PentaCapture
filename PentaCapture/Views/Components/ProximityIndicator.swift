@@ -22,16 +22,16 @@ struct ProximityIndicator: View {
           RadialGradient(
             colors: [progressColor.opacity(0.3), Color.clear],
             center: .center,
-            startRadius: 50,
-            endRadius: 75
+            startRadius: 40,
+            endRadius: 60
           )
         )
-        .frame(width: 150, height: 150)
+        .frame(width: 120, height: 120)
       
       // Background circle with glassmorphism
       Circle()
-        .stroke(Color.white.opacity(0.2), lineWidth: 14)
-        .frame(width: 110, height: 110)
+        .stroke(Color.white.opacity(0.2), lineWidth: 12)
+        .frame(width: 90, height: 90)
         .background(
           Circle()
             .fill(Color.black.opacity(0.3))
@@ -39,7 +39,7 @@ struct ProximityIndicator: View {
               Circle()
                 .fill(.ultraThinMaterial)
             )
-            .frame(width: 110, height: 110)
+            .frame(width: 90, height: 90)
         )
 
       // Progress arc with gradient
@@ -51,16 +51,16 @@ struct ProximityIndicator: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
           ),
-          style: StrokeStyle(lineWidth: 14, lineCap: .round)
+          style: StrokeStyle(lineWidth: 12, lineCap: .round)
         )
-        .frame(width: 110, height: 110)
+        .frame(width: 90, height: 90)
         .rotationEffect(.degrees(-90))
         .shadow(color: progressColor.opacity(0.8), radius: 10)
 
       // Center content
-      VStack(spacing: 4) {
+      VStack(spacing: 3) {
         Text("\(Int(progress * 100))%")
-          .font(.system(size: 36, weight: .bold, design: .rounded))
+          .font(.system(size: 32, weight: .bold, design: .rounded))
           .foregroundColor(.white)
           .contentTransition(.numericText())
           .shadow(color: .black.opacity(0.3), radius: 2)

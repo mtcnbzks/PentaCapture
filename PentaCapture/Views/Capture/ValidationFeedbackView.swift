@@ -18,7 +18,6 @@ struct ValidationFeedbackView: View {
         ValidationMetricsView(validation: validation)
       }
     }
-    .fixedSize(horizontal: false, vertical: true)
   }
 }
 
@@ -94,36 +93,49 @@ struct ValidationMetricsView: View {
   let validation: PoseValidation
 
   var body: some View {
-    // Son 2 adımda (vertex, donorArea) yüz açısı göstermiyoruz - yüz yok zaten
-    // Sadece ilk 3 adımda (frontFace, rightProfile, leftProfile) göster
-    // Yaw metric (Face direction) - for frontFace, leftProfile, rightProfile
-    if let currentYaw = validation.orientationValidation.currentYaw,
-      let targetYaw = validation.orientationValidation.targetYaw
-    {
+    // Fixed size container to prevent layout shifts
+    Group {
+      // Son 2 adımda (vertex, donorArea) yüz açısı göstermiyoruz - yüz yok zaten
+      // Sadece ilk 3 adımda (frontFace, rightProfile, leftProfile) göster
+      // Yaw metric (Face direction) - for frontFace, leftProfile, rightProfile
+      if let currentYaw = validation.orientationValidation.currentYaw,
+        let targetYaw = validation.orientationValidation.targetYaw
+      {
+        yawMetricContent(currentYaw: currentYaw, targetYaw: targetYaw)
+      } else {
+        // Invisible placeholder to maintain layout
+        Color.clear
+      }
+    }
+    .frame(width: 180, height: 50)
+  }
+  
+  @ViewBuilder
+  private func yawMetricContent(currentYaw: Double, targetYaw: Double) -> some View {
       let yawError = abs(currentYaw - targetYaw)
       let yawStatus =
         yawError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
 
-      HStack(spacing: 12) {
-        // Face tracking icon - minimal
+      HStack(spacing: 8) {
+        // Face tracking icon - compact
         Image(systemName: "face.smiling")
-          .font(.system(size: 18, weight: .medium))
+          .font(.system(size: 14, weight: .medium))
           .foregroundColor(.white.opacity(0.5))
 
-        // Direction arrow (if needed) - modern icon
+        // Direction arrow (if needed) - compact icon
         if currentYaw < -5 {
           Image(systemName: "arrow.left.circle.fill")
-            .font(.system(size: 24))
+            .font(.system(size: 18))
             .foregroundColor(.white.opacity(0.8))
         } else if currentYaw > 5 {
           Image(systemName: "arrow.right.circle.fill")
-            .font(.system(size: 24))
+            .font(.system(size: 18))
             .foregroundColor(.white.opacity(0.8))
         }
 
-        // Large current angle value with gradient
+        // Compact current angle value with gradient
         Text(String(format: "%.0f°", abs(currentYaw)))
-          .font(.system(size: 40, weight: .bold, design: .rounded))
+          .font(.system(size: 28, weight: .bold, design: .rounded))
           .foregroundStyle(
             LinearGradient(
               colors: [.white, .white.opacity(0.9)],
@@ -132,27 +144,27 @@ struct ValidationMetricsView: View {
             )
           )
           .monospacedDigit()
-          .shadow(color: .black.opacity(0.4), radius: 4)
+          .shadow(color: .black.opacity(0.4), radius: 3)
 
         // Minimal target reference
         Text("→ \(String(format: "%.0f°", targetYaw))")
-          .font(.system(size: 14, weight: .semibold))
+          .font(.system(size: 12, weight: .semibold))
           .foregroundColor(.white.opacity(0.5))
           .monospacedDigit()
 
-        // Modern status indicator with glow
+        // Compact status indicator
         Circle()
           .fill(yawStatusColor(yawStatus))
-          .frame(width: 12, height: 12)
-          .shadow(color: yawStatusColor(yawStatus).opacity(0.8), radius: 6)
+          .frame(width: 10, height: 10)
+          .shadow(color: yawStatusColor(yawStatus).opacity(0.8), radius: 4)
           .overlay(
             Circle()
               .stroke(yawStatusColor(yawStatus).opacity(0.5), lineWidth: 2)
-              .frame(width: 20, height: 20)
+              .frame(width: 16, height: 16)
           )
       }
-      .padding(.horizontal, 20)
-      .padding(.vertical, 14)
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
       .background(
         Capsule()
           .fill(Color.black.opacity(0.4))
@@ -161,12 +173,7 @@ struct ValidationMetricsView: View {
               .fill(.ultraThinMaterial)
           )
       )
-      .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
-      .fixedSize(horizontal: true, vertical: false)
-      .frame(maxWidth: .infinity, alignment: .center)
-    }
-    // Son 2 adımda (vertex, donorArea) hiçbir şey gösterme - yüz yok zaten
-    // Kullanıcı sadece proximity indicator'a bakacak
+      .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
   }
 
   private func yawStatusColor(_ status: ValidationStatus) -> Color {

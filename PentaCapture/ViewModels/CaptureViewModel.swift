@@ -957,6 +957,11 @@ class CaptureViewModel: ObservableObject {
     session.currentAngle = previousAngle
     resetValidationState()
   }
+  
+  func goToAngle(_ angle: CaptureAngle) {
+    session.currentAngle = angle
+    resetValidationState()
+  }
 
   // MARK: - Helpers
   var progressPercentage: Int {
