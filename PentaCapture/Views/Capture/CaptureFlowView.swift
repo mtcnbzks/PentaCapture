@@ -221,18 +221,6 @@ struct CaptureFlowView: View {
       print("🔄 Session reset detected - clearing video tracking")
       shownVideoAngles.removeAll()
     }
-    .onChange(of: viewModel.faceTrackingService.isTracking) { _ in
-      // Yüz tespit durumu değiştiğinde transition'ı kontrol et
-      if showingAngleTransition {
-        checkAngleTransitionDismiss()
-      }
-    }
-    .onChange(of: viewModel.faceTrackingService.currentHeadPose) { _ in
-      // Yüz pozisyonu tespit edildiğinde transition'ı kontrol et
-      if showingAngleTransition {
-        checkAngleTransitionDismiss()
-      }
-    }
     .alert("Hata", isPresented: .constant(viewModel.errorMessage != nil)) {
       Button("Tamam") {
         viewModel.errorMessage = nil
@@ -408,6 +396,9 @@ struct CaptureFlowView: View {
     guard let videoFileName = videoFileNameForAngle(angle) else {
       // No video needed, show normal transition
       if !showingVideoInstruction && !viewModel.session.isComplete {
+        // Pause capture while showing transition
+        viewModel.pauseCapture()
+        
         withAnimation {
           showingAngleTransition = true
           angleTransitionStartTime = Date()
@@ -442,45 +433,28 @@ struct CaptureFlowView: View {
   }
   
   /// Angle transition'ı kapatmak için kontrol eder
-  /// Minimum 1sn bekler ve eğer sonraki açı yüz gerektiriyorsa yüz tespit edilmesini bekler
+  /// 1.5 saniye sonra otomatik olarak kapatır
   private func checkAngleTransitionDismiss() {
     guard showingAngleTransition else { return }
     
-    // Minimum 1 saniye geçmiş mi?
+    // Minimum 1.5 saniye geçmiş mi?
     guard let startTime = angleTransitionStartTime,
-          Date().timeIntervalSince(startTime) >= 1.0 else {
-      // Henüz 1 saniye geçmemiş, 0.2 saniye sonra tekrar kontrol et
+          Date().timeIntervalSince(startTime) >= 1.5 else {
+      // Henüz 1.5 saniye geçmemiş, 0.2 saniye sonra tekrar kontrol et
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
         checkAngleTransitionDismiss()
       }
       return
     }
     
-    // Sonraki açı yüz gerektiriyor mu?
-    let nextAngle = viewModel.session.currentAngle
-    let requiresFaceDetection = nextAngle == .frontFace || 
-                                nextAngle == .rightProfile || 
-                                nextAngle == .leftProfile
-    
-    if requiresFaceDetection {
-      // Yüz tespit edildi mi?
-      let faceDetected = viewModel.faceTrackingService.isTracking && 
-                        viewModel.faceTrackingService.currentHeadPose != nil
-      
-      if !faceDetected {
-        // Henüz yüz tespit edilmemiş, 0.2 saniye sonra tekrar kontrol et
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-          checkAngleTransitionDismiss()
-        }
-        return
-      }
-    }
-    
-    // Her iki koşul da sağlandı - transition'ı kapat
+    // 1.5 saniye geçti - transition'ı kapat ve kamerayı resume et
     withAnimation {
       showingAngleTransition = false
       angleTransitionStartTime = nil
     }
+    
+    // Resume capture after transition
+    viewModel.resumeCapture()
   }
 }
 
