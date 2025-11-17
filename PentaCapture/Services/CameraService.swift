@@ -295,6 +295,17 @@ class CameraService: NSObject, ObservableObject {
       print("📝 Camera configuration committed")
     }
     
+    // Set session preset for photo capture
+    // Per Apple documentation: Use .photo preset for high-quality still image capture
+    if captureSession.canSetSessionPreset(.photo) {
+      captureSession.sessionPreset = .photo
+      print("📸 Session preset: .photo (high quality)")
+    } else {
+      // Fallback to high preset for older devices
+      captureSession.sessionPreset = .high
+      print("📸 Session preset: .high (fallback)")
+    }
+    
     // Log device information for debugging
     print("📱 Device Info:")
     print("   Model: \(UIDevice.current.model)")
