@@ -82,7 +82,7 @@ struct ContentView: View {
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
             }
-            .padding(.bottom, 32)
+            .padding(.bottom, 52)
 
             // Continue session card (if available)
             if let metadata = sessionPersistenceService.savedSessionMetadata {
@@ -107,7 +107,7 @@ struct ContentView: View {
               }
               )
               .padding(.horizontal, 24)
-              .padding(.bottom, 16)
+              .padding(.bottom, 36)
               .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {
               // Features info when no session
@@ -123,7 +123,7 @@ struct ContentView: View {
                   .fill(Color.white.opacity(0.05))
               )
               .padding(.horizontal, 24)
-              .padding(.bottom, 16)
+              .padding(.bottom, 36)
             }
 
             // Action buttons - minimal

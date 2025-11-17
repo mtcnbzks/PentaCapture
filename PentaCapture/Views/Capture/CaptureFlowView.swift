@@ -385,7 +385,7 @@ struct CaptureFlowView: View {
         .transition(.scale.combined(with: .opacity))
     }
     .padding(.horizontal, 56)
-    .padding(.bottom, 80)
+    .padding(.bottom, 40)
   }
   
   // MARK: - Angle Transition Helpers
