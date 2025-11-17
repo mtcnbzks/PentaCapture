@@ -94,6 +94,10 @@ class CameraService: NSObject, ObservableObject {
   @Published var capturedImage: UIImage?
   @Published var error: CameraError?
   @Published var flashMode: FlashMode = .off  // Default: flash off
+  
+  // Capture readiness state (iOS 17+)
+  // Per Apple WWDC 2023: Provides feedback on when photo output is ready for next capture
+  @Published var captureReadiness: AVCapturePhotoOutput.CaptureReadiness = .sessionNotRunning
 
   // MARK: - Internal Properties
   let captureSession = AVCaptureSession()
@@ -108,12 +112,44 @@ class CameraService: NSObject, ObservableObject {
 
   private var videoDataOutputDelegate: VideoDataOutputDelegate?
   private var photoCaptureDelegate: PhotoCaptureDelegate?
+  
+  // Readiness coordinator for capture readiness feedback (iOS 17+)
+  private var readinessCoordinator: AVCapturePhotoOutputReadinessCoordinator?
 
   // Idle timer management - auto-enable after 2 minutes
   private var idleTimerTask: Task<Void, Never>?
 
   // Publisher for video frames
   let framePublisher = PassthroughSubject<CVPixelBuffer, Never>()
+  
+  // MARK: - Performance Metrics
+  // Track capture performance for optimization and debugging
+  internal struct CaptureMetrics {
+    var captureStartTime: Date?
+    var captureEndTime: Date?
+    var processingStartTime: Date?
+    var processingEndTime: Date?
+    var totalCaptureCount: Int = 0
+    var successfulCaptureCount: Int = 0
+    var failedCaptureCount: Int = 0
+    
+    var captureLatency: TimeInterval? {
+      guard let start = captureStartTime, let end = captureEndTime else { return nil }
+      return end.timeIntervalSince(start)
+    }
+    
+    var processingTime: TimeInterval? {
+      guard let start = processingStartTime, let end = processingEndTime else { return nil }
+      return end.timeIntervalSince(start)
+    }
+    
+    var successRate: Double {
+      guard totalCaptureCount > 0 else { return 0 }
+      return Double(successfulCaptureCount) / Double(totalCaptureCount)
+    }
+  }
+  
+  internal var performanceMetrics = CaptureMetrics()
 
   // MARK: - Initialization
   override nonisolated init() {
@@ -258,9 +294,20 @@ class CameraService: NSObject, ObservableObject {
       captureSession.commitConfiguration()
       print("📝 Camera configuration committed")
     }
-
-    // Set session preset for high quality photo capture
-    captureSession.sessionPreset = .photo
+    
+    // Log device information for debugging
+    print("📱 Device Info:")
+    print("   Model: \(UIDevice.current.model)")
+    print("   System: \(UIDevice.current.systemName) \(UIDevice.current.systemVersion)")
+    
+    var systemInfo = utsname()
+    uname(&systemInfo)
+    let deviceIdentifier = withUnsafePointer(to: &systemInfo.machine) {
+      $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+        String(validatingUTF8: $0) ?? "Unknown"
+      }
+    }
+    print("   Device ID: \(deviceIdentifier)")
 
     // Setup video input
     guard
@@ -269,6 +316,8 @@ class CameraService: NSObject, ObservableObject {
     else {
       throw CameraError.noCameraAvailable
     }
+    
+    print("📸 Camera Device: \(videoDevice.localizedName)")
 
     let videoDeviceInput = try AVCaptureDeviceInput(device: videoDevice)
 
@@ -278,6 +327,10 @@ class CameraService: NSObject, ObservableObject {
 
     captureSession.addInput(videoDeviceInput)
     self.videoDeviceInput = videoDeviceInput
+
+    // Select optimal format BEFORE configuring device
+    // Per Apple documentation: Choose format with highest resolution and best quality
+    try selectOptimalFormat(for: videoDevice)
 
     // Configure video device for optimal capture
     try configureVideoDevice(videoDevice)
@@ -295,7 +348,46 @@ class CameraService: NSObject, ObservableObject {
     // QUALITY prioritization for maximum quality (iOS 13+)
     if #available(iOS 13.0, *) {
       photoOutput.maxPhotoQualityPrioritization = .quality  // Maximum quality!
-      print("📸 Photo output configured for QUALITY prioritization with JPEG format")
+      print("📸 Photo output configured for QUALITY prioritization")
+    }
+    
+    // Enable iOS 17+ Performance Features
+    // Per Apple WWDC 2023: These features significantly improve capture performance
+    if #available(iOS 17.0, *) {
+      print("📸 iOS 17+ Performance Features:")
+      
+      // Zero Shutter Lag (iPhone 11 Pro and newer)
+      // Per Apple WWDC 2023: Reduces capture latency significantly
+      if photoOutput.isZeroShutterLagSupported {
+        photoOutput.isZeroShutterLagEnabled = true
+        print("   ✅ Zero Shutter Lag: ENABLED")
+      } else {
+        print("   ❌ Zero Shutter Lag: NOT SUPPORTED (requires iPhone 11 Pro or newer)")
+      }
+      
+      // Responsive Capture (A12 Bionic and newer)
+      // Per Apple WWDC 2023: Allows overlapping captures for faster shot-to-shot times
+      // Note: Requires Zero Shutter Lag to be enabled
+      if photoOutput.isResponsiveCaptureSupported && photoOutput.isZeroShutterLagEnabled {
+        photoOutput.isResponsiveCaptureEnabled = true
+        print("   ✅ Responsive Capture: ENABLED")
+      } else if !photoOutput.isResponsiveCaptureSupported {
+        print("   ❌ Responsive Capture: NOT SUPPORTED (requires A12 Bionic or newer)")
+      } else {
+        print("   ⚠️ Responsive Capture: DISABLED (requires Zero Shutter Lag)")
+      }
+      
+      // Fast Capture Prioritization (A12 Bionic and newer)
+      // Per Apple WWDC 2023: Adapts quality dynamically for consistent shot-to-shot times
+      if photoOutput.isFastCapturePrioritizationSupported {
+        photoOutput.isFastCapturePrioritizationEnabled = true
+        print("   ✅ Fast Capture Prioritization: ENABLED")
+      } else {
+        print("   ❌ Fast Capture Prioritization: NOT SUPPORTED (requires A12 Bionic or newer)")
+      }
+    } else {
+      print("📸 Running on iOS < 17: Performance features not available")
+      print("   ℹ️  To get best performance, update to iOS 17 or later")
     }
 
     // Enable video stabilization for better quality
@@ -306,7 +398,9 @@ class CameraService: NSObject, ObservableObject {
       }
     }
 
-    print("📸 Using JPEG format - Available codecs: \(photoOutput.availablePhotoCodecTypes.map { $0.rawValue })")
+    print("📸 Photo output configuration complete")
+    print("   - Format: JPEG")
+    print("   - Available codecs: \(photoOutput.availablePhotoCodecTypes.map { $0.rawValue })")
 
     // Setup video data output for frame processing
     guard captureSession.canAddOutput(videoDataOutput) else {
@@ -334,25 +428,105 @@ class CameraService: NSObject, ObservableObject {
         connection.isVideoMirrored = true
       }
     }
+    
+    // Setup readiness coordinator (iOS 17+)
+    // Per Apple WWDC 2023: Provides feedback on when photo output is ready for capture
+    if #available(iOS 17.0, *) {
+      readinessCoordinator = AVCapturePhotoOutputReadinessCoordinator(photoOutput: photoOutput)
+      readinessCoordinator?.delegate = self
+      print("📸 Readiness coordinator configured for capture feedback")
+    }
   }
 
+  /// Select the optimal camera format for highest quality photo capture
+  /// Per Apple WWDC 2023: Choose format based on resolution, codec, and quality support
+  /// Implements robust fallback strategy for older devices (iPhone 11, etc.)
+  private func selectOptimalFormat(for device: AVCaptureDevice) throws {
+    try device.lockForConfiguration()
+    defer { device.unlockForConfiguration() }
+    
+    let formats = device.formats
+    print("📸 Evaluating \(formats.count) available formats...")
+    
+    // Strategy 1: Find formats that support highest photo quality (iOS 13.0+)
+    // Per Apple documentation: Look for isHighestPhotoQualitySupported
+    let highQualityFormats = formats.filter { format in
+      format.isHighestPhotoQualitySupported
+    }
+    
+    print("📸 Found \(highQualityFormats.count) high quality formats")
+    
+    // Try to select from high quality formats first
+    var selectedFormat: AVCaptureDevice.Format?
+    
+    if !highQualityFormats.isEmpty {
+      // Among high quality formats, select the one with highest resolution
+      let sortedFormats = highQualityFormats.sorted { format1, format2 in
+        let dims1 = CMVideoFormatDescriptionGetDimensions(format1.formatDescription)
+        let dims2 = CMVideoFormatDescriptionGetDimensions(format2.formatDescription)
+        let pixels1 = dims1.width * dims1.height
+        let pixels2 = dims2.width * dims2.height
+        return pixels1 > pixels2
+      }
+      selectedFormat = sortedFormats.first
+      print("✅ Strategy 1 (High Quality): Selected format")
+    } else {
+      // Strategy 2: FALLBACK for older devices - select highest resolution format
+      print("⚠️ No high quality format found, falling back to highest resolution format")
+      let sortedAllFormats = formats.sorted { format1, format2 in
+        let dims1 = CMVideoFormatDescriptionGetDimensions(format1.formatDescription)
+        let dims2 = CMVideoFormatDescriptionGetDimensions(format2.formatDescription)
+        let pixels1 = dims1.width * dims1.height
+        let pixels2 = dims2.width * dims2.height
+        return pixels1 > pixels2
+      }
+      selectedFormat = sortedAllFormats.first
+      print("✅ Strategy 2 (Fallback): Selected highest resolution format")
+    }
+    
+    // Apply the selected format
+    if let bestFormat = selectedFormat {
+      device.activeFormat = bestFormat
+      let dims = CMVideoFormatDescriptionGetDimensions(bestFormat.formatDescription)
+      print("📸 Selected format: \(dims.width)x\(dims.height)")
+      print("   - Highest photo quality supported: \(bestFormat.isHighestPhotoQualitySupported)")
+      
+      // Log supported frame rates for this format
+      if let frameRateRange = bestFormat.videoSupportedFrameRateRanges.first {
+        print("   - Frame rate range: \(frameRateRange.minFrameRate)-\(frameRateRange.maxFrameRate) fps")
+      }
+    } else {
+      // Strategy 3: Ultimate fallback - keep device default format
+      // This should never happen, but defensive programming
+      print("⚠️ Could not select custom format, using device default")
+      let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+      print("📸 Using default format: \(dims.width)x\(dims.height)")
+    }
+  }
+  
   private func configureVideoDevice(_ device: AVCaptureDevice) throws {
     try device.lockForConfiguration()
     defer { device.unlockForConfiguration() }
 
-    // Enable auto focus
+    // Enable auto focus with subject area monitoring
+    // Per Apple documentation: This improves focus accuracy
     if device.isFocusModeSupported(.continuousAutoFocus) {
       device.focusMode = .continuousAutoFocus
+      // Enable subject area change monitoring for better focus accuracy
+      device.isSubjectAreaChangeMonitoringEnabled = true
+      print("📸 Continuous auto focus enabled with subject area monitoring")
     }
 
-    // Enable auto exposure
+    // Enable auto exposure with subject area monitoring
     if device.isExposureModeSupported(.continuousAutoExposure) {
       device.exposureMode = .continuousAutoExposure
+      print("📸 Continuous auto exposure enabled")
     }
 
     // Enable auto white balance
     if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
       device.whiteBalanceMode = .continuousAutoWhiteBalance
+      print("📸 Continuous auto white balance enabled")
     }
 
     // Enable low light boost for better quality in dark environments
@@ -362,10 +536,11 @@ class CameraService: NSObject, ObservableObject {
     }
 
     // Set frame rate for better performance
+    // Per Apple WWDC: 30fps is optimal for photo capture use cases
     let desiredFrameRate = 30.0
     let formatDescription = device.activeFormat.formatDescription
     let dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
-    print("Camera resolution: \(dimensions.width)x\(dimensions.height)")
+    print("📸 Active camera resolution: \(dimensions.width)x\(dimensions.height)")
 
     for range in device.activeFormat.videoSupportedFrameRateRanges {
       if range.maxFrameRate >= desiredFrameRate && range.minFrameRate <= desiredFrameRate {
@@ -373,6 +548,7 @@ class CameraService: NSObject, ObservableObject {
           value: 1, timescale: Int32(desiredFrameRate))
         device.activeVideoMaxFrameDuration = CMTimeMake(
           value: 1, timescale: Int32(desiredFrameRate))
+        print("📸 Frame rate locked to \(desiredFrameRate) fps")
         break
       }
     }
@@ -450,6 +626,40 @@ class CameraService: NSObject, ObservableObject {
     }
   }
 
+  // MARK: - Performance Logging
+  /// Log performance metrics for debugging and optimization
+  /// Per Apple best practices: Monitor capture performance to identify bottlenecks
+  func logPerformanceMetrics() {
+    let metrics = performanceMetrics
+    
+    print("📊 Camera Performance Metrics:")
+    print("   Total captures: \(metrics.totalCaptureCount)")
+    print("   Successful: \(metrics.successfulCaptureCount)")
+    print("   Failed: \(metrics.failedCaptureCount)")
+    print("   Success rate: \(String(format: "%.1f%%", metrics.successRate * 100))")
+    
+    if let latency = metrics.captureLatency {
+      print("   Last capture latency: \(String(format: "%.3f", latency))s")
+    }
+    
+    if let processingTime = metrics.processingTime {
+      print("   Last processing time: \(String(format: "%.3f", processingTime))s")
+    }
+    
+    // Log performance warnings
+    if let latency = metrics.captureLatency, latency > 0.5 {
+      print("⚠️ High capture latency detected: \(String(format: "%.3f", latency))s")
+    }
+    
+    if let processingTime = metrics.processingTime, processingTime > 1.0 {
+      print("⚠️ Long processing time detected: \(String(format: "%.3f", processingTime))s")
+    }
+    
+    if metrics.successRate < 0.9 && metrics.totalCaptureCount >= 5 {
+      print("⚠️ Low success rate: \(String(format: "%.1f%%", metrics.successRate * 100))")
+    }
+  }
+  
   // MARK: - Idle Timer Management
   private func scheduleIdleTimerReenable() {
     // Cancel any existing task
@@ -484,6 +694,10 @@ class CameraService: NSObject, ObservableObject {
       throw CameraError.captureSessionNotRunning
     }
 
+    // Record capture start time for performance metrics
+    performanceMetrics.captureStartTime = Date()
+    performanceMetrics.totalCaptureCount += 1
+    
     print("📸 CameraService: Setting up photo capture...")
     
     // Lock focus and exposure for sharpest image
@@ -506,6 +720,12 @@ class CameraService: NSObject, ObservableObject {
       // Per Apple documentation: Default AVCapturePhotoSettings() uses JPEG format
       let settings = AVCapturePhotoSettings()
       print("📸 Using JPEG format for capture")
+      
+      // Track this capture request with readiness coordinator (iOS 17+)
+      // Per Apple WWDC 2023: This provides feedback on capture progress
+      if #available(iOS 17.0, *) {
+        readinessCoordinator?.startTrackingCaptureRequest(using: settings)
+      }
       
       // Configure flash mode - respect user's selection
       // User can toggle between .off and .auto
@@ -546,25 +766,55 @@ class CameraService: NSObject, ObservableObject {
       )
 
       // CRITICAL: Store delegate as instance variable to prevent garbage collection
-      self.photoCaptureDelegate = PhotoCaptureDelegate { [weak self] result in
-        print("📸 CameraService: Photo capture delegate callback received")
-        
-        // Re-enable continuous auto focus/exposure after capture
-        if let device = self?.videoDeviceInput?.device {
-          try? device.lockForConfiguration()
-          if device.isFocusModeSupported(.continuousAutoFocus) {
-            device.focusMode = .continuousAutoFocus
-          }
-          if device.isExposureModeSupported(.continuousAutoExposure) {
-            device.exposureMode = .continuousAutoExposure
-          }
-          device.unlockForConfiguration()
-          print("🔓 Focus/Exposure unlocked after capture")
-        }
-        
-        continuation.resume(with: result)
-        // Clear the delegate after use to free memory
-        self?.photoCaptureDelegate = nil
+      if #available(iOS 17.0, *) {
+        self.photoCaptureDelegate = PhotoCaptureDelegate(
+          completion: { [weak self] result in
+            print("📸 CameraService: Photo capture delegate callback received")
+            
+            // Re-enable continuous auto focus/exposure after capture
+            if let device = self?.videoDeviceInput?.device {
+              try? device.lockForConfiguration()
+              if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+              }
+              if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+              }
+              device.unlockForConfiguration()
+              print("🔓 Focus/Exposure unlocked after capture")
+            }
+            
+            continuation.resume(with: result)
+            // Clear the delegate after use to free memory
+            self?.photoCaptureDelegate = nil
+          },
+          readinessCoordinator: self.readinessCoordinator,
+          cameraService: self
+        )
+      } else {
+        self.photoCaptureDelegate = PhotoCaptureDelegate(
+          completion: { [weak self] result in
+            print("📸 CameraService: Photo capture delegate callback received")
+            
+            // Re-enable continuous auto focus/exposure after capture
+            if let device = self?.videoDeviceInput?.device {
+              try? device.lockForConfiguration()
+              if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+              }
+              if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+              }
+              device.unlockForConfiguration()
+              print("🔓 Focus/Exposure unlocked after capture")
+            }
+            
+            continuation.resume(with: result)
+            // Clear the delegate after use to free memory
+            self?.photoCaptureDelegate = nil
+          },
+          cameraService: self
+        )
       }
 
       print("📸 CameraService: Calling photoOutput.capturePhoto()...")
@@ -577,19 +827,54 @@ class CameraService: NSObject, ObservableObject {
 // MARK: - Photo Capture Delegate
 private class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
   private let completion: (Result<UIImage, Error>) -> Void
+  private let readinessCoordinator: AVCapturePhotoOutputReadinessCoordinator?
+  private let cameraService: CameraService
+  private let processingStartTime = Date()
 
-  init(completion: @escaping (Result<UIImage, Error>) -> Void) {
+  init(
+    completion: @escaping (Result<UIImage, Error>) -> Void,
+    readinessCoordinator: AVCapturePhotoOutputReadinessCoordinator? = nil,
+    cameraService: CameraService
+  ) {
     self.completion = completion
+    self.readinessCoordinator = readinessCoordinator
+    self.cameraService = cameraService
     print("📸 PhotoCaptureDelegate: Initialized")
+  }
+  
+  func photoOutput(
+    _ output: AVCapturePhotoOutput,
+    willBeginCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings
+  ) {
+    // Record when actual sensor capture begins
+    Task { @MainActor in
+      cameraService.performanceMetrics.processingStartTime = Date()
+    }
   }
 
   func photoOutput(
     _ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?
   ) {
     print("📸 PhotoCaptureDelegate: didFinishProcessingPhoto called")
+    
+    // Record processing end time
+    Task { @MainActor in
+      cameraService.performanceMetrics.processingEndTime = Date()
+      cameraService.performanceMetrics.captureEndTime = Date()
+    }
+    
+    // Stop tracking this capture request (iOS 17+)
+    // Per Apple documentation: Use uniqueID to stop tracking
+    if #available(iOS 17.0, *) {
+      readinessCoordinator?.stopTrackingCaptureRequest(using: photo.resolvedSettings.uniqueID)
+    }
 
     if let error = error {
       print("❌ PhotoCaptureDelegate: Error - \(error.localizedDescription)")
+      Task { @MainActor in
+        cameraService.performanceMetrics.failedCaptureCount += 1
+        cameraService.logPerformanceMetrics()
+      }
       completion(.failure(error))
       return
     }
@@ -615,6 +900,13 @@ private class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     print(
       "✅ PhotoCaptureDelegate: Created mirrored UIImage with size: \(image.size)"
     )
+    
+    // Record successful capture
+    Task { @MainActor in
+      cameraService.performanceMetrics.successfulCaptureCount += 1
+      cameraService.logPerformanceMetrics()
+    }
+    
     completion(.success(image))
   }
 
@@ -679,5 +971,36 @@ private class VideoDataOutputDelegate: NSObject, AVCaptureVideoDataOutputSampleB
     }
 
     framePublisher.send(pixelBuffer)
+  }
+}
+
+// MARK: - Readiness Coordinator Delegate (iOS 17+)
+@available(iOS 17.0, *)
+extension CameraService: AVCapturePhotoOutputReadinessCoordinatorDelegate {
+  nonisolated func readinessCoordinator(
+    _ coordinator: AVCapturePhotoOutputReadinessCoordinator,
+    captureReadinessDidChange captureReadiness: AVCapturePhotoOutput.CaptureReadiness
+  ) {
+    // Update readiness state on main actor
+    // Per Apple WWDC 2023: Use this to update UI and control capture button state
+    Task { @MainActor in
+      self.captureReadiness = captureReadiness
+      
+      // Log readiness changes for debugging
+      switch captureReadiness {
+      case .ready:
+        print("📸 Capture ready - can capture now")
+      case .sessionNotRunning:
+        print("⏹️ Capture not ready - session not running")
+      case .notReadyMomentarily:
+        print("⏳ Capture not ready momentarily - brief delay expected")
+      case .notReadyWaitingForCapture:
+        print("⏸️ Capture not ready - waiting for capture to complete")
+      case .notReadyWaitingForProcessing:
+        print("⚙️ Capture not ready - waiting for processing to complete")
+      @unknown default:
+        print("❓ Capture readiness: unknown state")
+      }
+    }
   }
 }
