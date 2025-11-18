@@ -71,29 +71,43 @@ class StorageService: ObservableObject {
     }
   }
 
-  func requestAuthorization() {
+  /// Request authorization and call completion handler with result
+  /// This ensures we only ask once and handle the response properly
+  func requestAuthorization(completion: @escaping (Bool) -> Void) {
     if #available(iOS 14, *) {
       PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
         DispatchQueue.main.async {
-          guard let self = self else { return }
+          guard let self = self else { 
+            completion(false)
+            return 
+          }
           self.authorizationStatus = status
           self.isAuthorized = (status == .authorized || status == .limited)
 
           if !self.isAuthorized {
             self.error = .unauthorized
           }
+          
+          // Call completion with authorization result
+          completion(self.isAuthorized)
         }
       }
     } else {
       PHPhotoLibrary.requestAuthorization { [weak self] status in
         DispatchQueue.main.async {
-          guard let self = self else { return }
+          guard let self = self else { 
+            completion(false)
+            return 
+          }
           self.authorizationStatus = status
           self.isAuthorized = (status == .authorized)
 
           if !self.isAuthorized {
             self.error = .unauthorized
           }
+          
+          // Call completion with authorization result
+          completion(self.isAuthorized)
         }
       }
     }
@@ -276,12 +290,36 @@ class StorageService: ObservableObject {
   // MARK: - Helper Methods
 
   /// Share photos using UIActivityViewController
+  /// Creates temporary files for better compatibility with apps like WhatsApp
   func createShareSheet(for session: CaptureSession) -> UIActivityViewController? {
     let images = session.capturedPhotos.compactMap { $0.image }
     guard !images.isEmpty else { return nil }
 
+    // Create temporary file URLs for better sharing compatibility
+    // WhatsApp and other apps prefer file URLs over UIImage objects
+    var fileURLs: [URL] = []
+    let tempDir = FileManager.default.temporaryDirectory
+    
+    for (index, image) in images.enumerated() {
+      // Use JPEG format with high quality for sharing
+      guard let imageData = image.jpegData(compressionQuality: 0.95) else { continue }
+      
+      let fileName = "pentacapture_photo_\(index + 1).jpg"
+      let fileURL = tempDir.appendingPathComponent(fileName)
+      
+      do {
+        try imageData.write(to: fileURL)
+        fileURLs.append(fileURL)
+      } catch {
+        print("⚠️ Failed to write temp file for sharing: \(error)")
+      }
+    }
+    
+    // If no files were created, fall back to images
+    let activityItems: [Any] = fileURLs.isEmpty ? images : fileURLs
+    
     let activityVC = UIActivityViewController(
-      activityItems: images,
+      activityItems: activityItems,
       applicationActivities: nil
     )
 

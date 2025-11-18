@@ -268,15 +268,14 @@ struct ReviewView: View {
   private func saveToGallery() {
     // Check if we need to request permission first
     if !storageService.isAuthorized {
-      // Request permission - this is the first time user tries to save
-      storageService.requestAuthorization()
-      
-      // Wait a bit for permission dialog and check again
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-        if storageService.isAuthorized {
-          performSave()
+      // Request permission - this only happens once
+      // The completion handler ensures we only proceed if authorized
+      storageService.requestAuthorization { authorized in
+        if authorized {
+          // Permission granted, proceed with save
+          self.performSave()
         } else {
-          // Permission denied or still pending - user will see error alert from StorageService
+          // Permission denied - user will see error from StorageService
           print("⚠️ Gallery permission not granted")
         }
       }
