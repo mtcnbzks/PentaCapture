@@ -19,6 +19,7 @@ struct VideoInstructionView: View {
   @State private var playerItem: AVPlayerItem?
   @State private var isVideoFinished = false
   @State private var showSkipButton = false
+  @State private var showReplayButton = false
   @State private var videoLoadingState: VideoLoadingState = .loading
   @State private var cancellables = Set<AnyCancellable>()
   
@@ -55,6 +56,11 @@ struct VideoInstructionView: View {
             .onAppear {
               print("📹 Starting video playback...")
               player.play()
+              
+              // Show replay button immediately when video starts
+              withAnimation {
+                showReplayButton = true
+              }
               
               // Show skip button after 2 seconds
               DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
@@ -100,40 +106,71 @@ struct VideoInstructionView: View {
         }
       }
       
-      // Skip/Continue button - only show for ready state
+      // Control buttons - only show for ready state
       if case .ready = videoLoadingState {
         VStack {
           Spacer()
           
-          if showSkipButton || isVideoFinished {
-            Button(action: {
-              onComplete()
-            }) {
-              HStack(spacing: 12) {
-                Image(systemName: isVideoFinished ? "checkmark.circle.fill" : "forward.fill")
-                  .font(.system(size: 20, weight: .semibold))
-                
-                Text(isVideoFinished ? "Devam Et" : "Atla")
-                  .font(.system(size: 18, weight: .bold))
-              }
-              .foregroundColor(.white)
-              .padding(.horizontal, 32)
-              .padding(.vertical, 16)
-              .background(
-                Capsule()
-                  .fill(
-                    LinearGradient(
-                      colors: [Color.blue, Color.blue.opacity(0.8)],
-                      startPoint: .leading,
-                      endPoint: .trailing
+          HStack(spacing: 20) {
+            // Replay button - show when video starts playing
+            if showReplayButton {
+              Button(action: {
+                replayVideo()
+              }) {
+                HStack(spacing: 8) {
+                  Image(systemName: "arrow.counterclockwise.circle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                  
+                  Text("Yeniden Oynat")
+                    .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                  Capsule()
+                    .fill(Color.black.opacity(0.6))
+                    .overlay(
+                      Capsule()
+                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
                     )
-                  )
-                  .shadow(color: .black.opacity(0.3), radius: 12, y: 6)
-              )
+                    .shadow(color: .black.opacity(0.3), radius: 12, y: 6)
+                )
+              }
+              .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .padding(.bottom, 50)
+            
+            // Skip/Continue button
+            if showSkipButton || isVideoFinished {
+              Button(action: {
+                onComplete()
+              }) {
+                HStack(spacing: 10) {
+                  Image(systemName: isVideoFinished ? "checkmark.circle.fill" : "forward.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                  
+                  Text(isVideoFinished ? "Devam Et" : "Atla")
+                    .font(.system(size: 15, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                  Capsule()
+                    .fill(
+                      LinearGradient(
+                        colors: [Color.blue, Color.blue.opacity(0.8)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                      )
+                    )
+                    .shadow(color: .black.opacity(0.3), radius: 12, y: 6)
+                )
+              }
+              .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
           }
+          .padding(.bottom, 50)
         }
       }
     }
@@ -142,6 +179,28 @@ struct VideoInstructionView: View {
     }
     .onDisappear {
       cleanupPlayer()
+    }
+  }
+  
+  // MARK: - Player Controls
+  
+  /// Replay the video from the beginning
+  private func replayVideo() {
+    guard let player = player else { return }
+    
+    print("🔄 Replaying video from beginning...")
+    
+    // Seek to the beginning
+    player.seek(to: .zero) { finished in
+      if finished {
+        print("✅ Seeked to beginning, starting playback...")
+        player.play()
+        
+        // Reset video finished state
+        withAnimation {
+          isVideoFinished = false
+        }
+      }
     }
   }
   

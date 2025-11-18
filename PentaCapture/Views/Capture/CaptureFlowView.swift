@@ -16,7 +16,6 @@ struct CaptureFlowView: View {
   @State private var angleTransitionStartTime: Date?
   @State private var showingVideoInstruction = false
   @State private var currentVideoFileName: String?
-  @State private var shownVideoAngles: Set<CaptureAngle> = []  // Track which angles have shown videos
   @AppStorage("debugMode") private var debugMode = false
   @Environment(\.dismiss) var dismiss
 
@@ -216,11 +215,6 @@ struct CaptureFlowView: View {
       // When angle changes (e.g., retake, session restored), check if we need to show video
       checkAndShowVideoIfNeeded(for: newAngle)
     }
-    .onChange(of: viewModel.session.sessionId) { _ in
-      // Session was reset - clear shown video tracking
-      print("🔄 Session reset detected - clearing video tracking")
-      shownVideoAngles.removeAll()
-    }
     .alert("Hata", isPresented: .constant(viewModel.errorMessage != nil)) {
       Button("Tamam") {
         viewModel.errorMessage = nil
@@ -390,7 +384,8 @@ struct CaptureFlowView: View {
     }
   }
   
-  /// Check if video instruction is needed for this angle and show it if not already shown
+  /// Check if video instruction is needed for this angle and show it
+  /// Videos for vertex and donorArea are shown every time the user reaches these angles
   private func checkAndShowVideoIfNeeded(for angle: CaptureAngle) {
     // Check if this angle needs a video
     guard let videoFileName = videoFileNameForAngle(angle) else {
@@ -408,17 +403,8 @@ struct CaptureFlowView: View {
       return
     }
     
-    // Check if we already showed video for this angle
-    if shownVideoAngles.contains(angle) {
-      print("📹 Video already shown for \(angle.title), skipping")
-      return
-    }
-    
-    // Show video instruction
+    // Show video instruction every time for vertex and donorArea
     print("📹 Showing video instruction for \(angle.title): \(videoFileName)")
-    
-    // Mark as shown
-    shownVideoAngles.insert(angle)
     
     // Pause capture while showing video
     viewModel.pauseCapture()
