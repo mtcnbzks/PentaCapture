@@ -1,7 +1,5 @@
 # PentaCapture
 
-**Smile Hair Clinic Hackathon 2025 - Mobil Uygulama Kategorisi**
-
 PentaCapture, saç/kafa derisi bölgelerinin 5 kritik açıdan tutarlı ve profesyonel bir şekilde fotoğraflanmasını sağlayan akıllı bir self-capture iOS uygulamasıdır. Uygulama, ARKit yüz takibi, CoreMotion sensörleri ve gelişmiş validasyon algoritmaları kullanarak kullanıcıya rehberlik eder ve doğru pozisyon yakalandığında otomatik olarak fotoğraf çeker.
 
 > ⚠️ **GEREKSINIM**: Bu uygulama **iOS 17.6+** ve **ARKit Face Tracking**'e tamamen bağımlıdır. **iPhone XR veya daha yeni cihaz gereklidir**. Daha eski iOS sürümleri veya cihazlar desteklenmez.
