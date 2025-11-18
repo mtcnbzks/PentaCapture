@@ -22,6 +22,7 @@ class CaptureViewModel: ObservableObject {
   @Published var isCapturing = false
   @Published var showSuccess = false
   @Published var errorMessage: String?
+  @Published var isShowingTransition = false  // Pause validation during transitions
 
   // MARK: - Services
   nonisolated(unsafe) let cameraService: CameraService
@@ -238,8 +239,39 @@ class CaptureViewModel: ObservableObject {
 
   // MARK: - Lifecycle Helpers
 
+  /// Pause validation only - camera stays running for pre-warming
+  /// Use this during angle transitions to keep camera ready
+  func pauseValidation() {
+    print("⏸️ Pausing validation (camera stays warm)")
+    
+    // Cancel countdown if active
+    if isCountingDown {
+      cancelCountdown()
+    }
+    
+    // Set transition flag to stop validation loop
+    isShowingTransition = true
+    
+    // Pause audio feedback during transition
+    audioService.stopProximityFeedback()
+  }
+  
+  /// Resume validation after transition
+  /// Camera is already running, just resume validation
+  func resumeValidation() {
+    print("▶️ Resuming validation (camera already warm)")
+    
+    // Clear transition flag to resume validation loop
+    isShowingTransition = false
+    
+    // Resume audio feedback
+    audioService.startProximityFeedback()
+  }
+
+  /// Pause capture completely - stops camera and all services
+  /// Use this when app goes to background or review screen
   func pauseCapture() {
-    print("⏸️ Pausing capture")
+    print("⏸️ Pausing capture (full pause)")
 
     // Cancel countdown if active
     if isCountingDown {
@@ -287,8 +319,8 @@ class CaptureViewModel: ObservableObject {
 
   // MARK: - Frame Processing (ARKit-based)
   private func performValidation(_ pixelBuffer: CVPixelBuffer?) async {
-    // Only skip if actively capturing the photo, NOT during countdown
-    guard !isCapturing else { return }
+    // Skip validation during capture or transitions (but camera stays running for pre-warming)
+    guard !isCapturing && !isShowingTransition else { return }
     let currentAngle = session.currentAngle
 
     // Log tracking state periodically

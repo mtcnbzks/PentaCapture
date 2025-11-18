@@ -30,9 +30,10 @@ struct CaptureFlowView: View {
             currentVideoFileName = nil
           }
           
-          // Resume capture after video
+          // OPTIMIZATION: Resume validation only - camera was already running
+          // This provides instant readiness since camera was pre-warmed during video
           DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            viewModel.resumeCapture()
+            viewModel.resumeValidation()
           }
         }
         .zIndex(100)  // Ensure video is on top
@@ -391,8 +392,9 @@ struct CaptureFlowView: View {
     guard let videoFileName = videoFileNameForAngle(angle) else {
       // No video needed, show normal transition
       if !showingVideoInstruction && !viewModel.session.isComplete {
-        // Pause capture while showing transition
-        viewModel.pauseCapture()
+        // OPTIMIZATION: Pause validation only - camera stays running for pre-warming
+        // This reduces camera warmup time when transition ends
+        viewModel.pauseValidation()
         
         withAnimation {
           showingAngleTransition = true
@@ -406,8 +408,9 @@ struct CaptureFlowView: View {
     // Show video instruction every time for vertex and donorArea
     print("📹 Showing video instruction for \(angle.title): \(videoFileName)")
     
-    // Pause capture while showing video
-    viewModel.pauseCapture()
+    // OPTIMIZATION: Pause validation only - camera stays running for pre-warming
+    // This keeps camera ready for faster capture after video
+    viewModel.pauseValidation()
     
     // Show video after a brief delay
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -433,14 +436,15 @@ struct CaptureFlowView: View {
       return
     }
     
-    // 1.5 saniye geçti - transition'ı kapat ve kamerayı resume et
+    // 1.5 saniye geçti - transition'ı kapat ve validasyonu resume et
     withAnimation {
       showingAngleTransition = false
       angleTransitionStartTime = nil
     }
     
-    // Resume capture after transition
-    viewModel.resumeCapture()
+    // OPTIMIZATION: Resume validation only - camera was already running
+    // This provides instant readiness since camera was pre-warmed
+    viewModel.resumeValidation()
   }
 }
 
