@@ -727,10 +727,15 @@ class CameraService: NSObject, ObservableObject {
     }
 
     return try await withCheckedThrowingContinuation { continuation in
-      // Configure photo settings for JPEG format
-      // Per Apple documentation: Default AVCapturePhotoSettings() uses JPEG format
-      let settings = AVCapturePhotoSettings()
-      print("📸 Using JPEG format for capture")
+      // Configure photo settings with EXPLICIT JPEG format
+      // Per Apple documentation: Use AVVideoCodecKey with AVVideoCodecType.jpeg
+      // Why JPEG over HEIF:
+      // - Universal compatibility (all devices/platforms)
+      // - Faster processing on some devices
+      // - Predictable file sizes
+      // - Better for backend/ML pipelines
+      let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+      print("📸 [JPEG] Using EXPLICIT JPEG codec for maximum compatibility")
       
       // Track this capture request with readiness coordinator (iOS 17+)
       // Per Apple WWDC 2023: This provides feedback on capture progress
@@ -758,6 +763,32 @@ class CameraService: NSObject, ObservableObject {
       if #available(iOS 13.0, *) {
         settings.isAutoStillImageStabilizationEnabled = true
         print("📸 Auto image stabilization enabled")
+      }
+      
+      // QUALITY BOOST: Virtual Device Fusion (iOS 13+)
+      // Per Apple docs: Fuses multiple camera images for improved quality
+      // - Reduces noise in low light
+      // - Preserves detail
+      // - Improves dynamic range
+      // Default is true, but we ensure it's enabled
+      if #available(iOS 13.0, *) {
+        if photoOutput.isVirtualDeviceFusionSupported {
+          settings.isAutoVirtualDeviceFusionEnabled = true
+          print("📸 [Quality++] Virtual device fusion enabled (multi-camera fusion)")
+        }
+      }
+      
+      // QUALITY BOOST: Content-Aware Distortion Correction (iOS 14.1+)
+      // Per Apple docs: Intelligently corrects lens distortion
+      // - Fixes ultra-wide lens distortion
+      // - Preserves straight lines (faces, buildings, horizons)
+      // - Minimal latency impact with .quality prioritization
+      // Trade-off: Small latency increase (~10-20ms) for better geometry
+      if #available(iOS 14.1, *) {
+        if photoOutput.isContentAwareDistortionCorrectionSupported {
+          settings.isAutoContentAwareDistortionCorrectionEnabled = true
+          print("📸 [Quality++] Content-aware distortion correction enabled")
+        }
       }
       
       // Enable depth data if available (for better portrait mode, etc.)

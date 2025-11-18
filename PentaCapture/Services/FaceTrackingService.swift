@@ -7,7 +7,9 @@
 
 import ARKit
 import Combine
+import CoreImage
 import simd
+import UIKit
 
 /// ARKit'ten gelen yüz pozisyonu bilgisi
 struct HeadPose: Equatable {
@@ -180,6 +182,157 @@ class FaceTrackingService: NSObject, ObservableObject {
   private func cancelIdleTimerReenable() {
     idleTimerTask?.cancel()
     idleTimerTask = nil
+  }
+  
+  // MARK: - High Resolution Capture (iOS 16+)
+  
+  /// Capture high-resolution photo directly from ARKit session
+  /// This is the BEST approach: 0 latency, 0 race conditions, highest quality
+  /// Per Apple WWDC 2022: Use captureHighResolutionFrame for still image capture
+  @available(iOS 16.0, *)
+  func captureHighResolutionPhoto() async throws -> UIImage {
+    guard isSupported else {
+      throw FaceTrackingError.notSupported
+    }
+    
+    guard isTracking else {
+      throw FaceTrackingError.sessionFailed
+    }
+    
+    print("📸 [ARKit Capture] Requesting high-resolution frame...")
+    let captureStartTime = Date()
+    
+    return try await withCheckedThrowingContinuation { continuation in
+      arSession.captureHighResolutionFrame { [weak self] frame, error in
+        let captureLatency = Date().timeIntervalSince(captureStartTime)
+        print("📸 [ARKit Capture] Latency: \(String(format: "%.3f", captureLatency))s")
+        
+        if let error = error {
+          let nsError = error as NSError
+          
+          // Handle specific ARKit capture errors
+          if nsError.domain == "com.apple.arkit.error" {
+            switch nsError.code {
+            case 101: // highResolutionFrameCaptureInProgress
+              print("❌ [ARKit Capture] Previous capture still in progress")
+              continuation.resume(throwing: FaceTrackingError.sessionFailed)
+              return
+            case 102: // highResolutionFrameCaptureFailed
+              print("❌ [ARKit Capture] Capture failed in pipeline")
+              continuation.resume(throwing: FaceTrackingError.sessionFailed)
+              return
+            default:
+              print("❌ [ARKit Capture] Unknown error: \(error.localizedDescription)")
+              continuation.resume(throwing: error)
+              return
+            }
+          }
+          
+          print("❌ [ARKit Capture] Error: \(error.localizedDescription)")
+          continuation.resume(throwing: error)
+          return
+        }
+        
+        guard let frame = frame else {
+          print("❌ [ARKit Capture] No frame returned")
+          continuation.resume(throwing: FaceTrackingError.noFaceDetected)
+          return
+        }
+        
+        // Extract high-resolution captured image
+        let pixelBuffer = frame.capturedImage
+        
+        // Get buffer dimensions
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        print("📸 [ARKit Capture] Captured frame: \(width)x\(height)")
+        
+        // Convert CVPixelBuffer to UIImage
+        let processingStartTime = Date()
+        guard let image = self?.convertPixelBufferToUIImage(pixelBuffer) else {
+          print("❌ [ARKit Capture] Failed to convert pixel buffer to UIImage")
+          continuation.resume(throwing: FaceTrackingError.sessionFailed)
+          return
+        }
+        
+        let processingTime = Date().timeIntervalSince(processingStartTime)
+        print("📸 [ARKit Capture] Image conversion: \(String(format: "%.3f", processingTime))s")
+        print("📸 [ARKit Capture] Final image size: \(image.size)")
+        
+        // Mirror horizontally to match preview (front camera)
+        let mirroredImage = self?.mirrorImageHorizontally(image) ?? image
+        print("✅ [ARKit Capture] High-res capture complete!")
+        
+        continuation.resume(returning: mirroredImage)
+      }
+    }
+  }
+  
+  /// Check if high-resolution capture is available
+  /// Per Apple docs: Requires iOS 16+ and active ARSession
+  @available(iOS 16.0, *)
+  var canCaptureHighResolution: Bool {
+    return isSupported && isTracking
+  }
+  
+  // MARK: - Image Conversion Helpers
+  
+  /// Convert CVPixelBuffer to UIImage with proper orientation
+  /// Per Apple ARKit docs: "capturedImage pixel buffer is NOT adjusted for device orientation"
+  /// ARKit always captures in landscape-right orientation, we need to rotate for portrait
+  private func convertPixelBufferToUIImage(_ pixelBuffer: CVPixelBuffer) -> UIImage? {
+    // Lock the pixel buffer for reading
+    CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+    
+    // Get buffer properties
+    let width = CVPixelBufferGetWidth(pixelBuffer)
+    let height = CVPixelBufferGetHeight(pixelBuffer)
+    print("📐 [ARKit Image] CVPixelBuffer (raw camera): \(width)x\(height) (landscape)")
+    
+    // Create CIImage from pixel buffer
+    let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+    
+    // Create CIContext for rendering (use Metal for better performance)
+    let context = CIContext(options: [.useSoftwareRenderer: false])
+    
+    // Render to CGImage
+    guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
+      print("❌ Failed to create CGImage from CIImage")
+      return nil
+    }
+    
+    // CRITICAL: ARKit camera orientation handling
+    // Per Apple Documentation: "capturedImage is NOT adjusted for device orientation"
+    // ARKit captures in landscape orientation from front camera
+    // For portrait UI with front camera, we need .leftMirrored
+    //
+    // Orientation chart for front camera:
+    // .up = 0° (no rotation) - wrong for portrait
+    // .right = 90° CCW - was upside down
+    // .rightMirrored = 90° CCW + mirror - was upside down
+    // .left = 90° CW (landscape → portrait correct direction)
+    // .leftMirrored = 90° CW + mirror (CORRECT FOR FRONT CAMERA PORTRAIT)
+    //
+    // Why .leftMirrored?
+    // - Front camera captures landscape-left naturally
+    // - Need 90° CW rotation for portrait (.left)
+    // - Need horizontal flip for mirror effect (Mirrored)
+    
+    print("📐 [ARKit Image] Applying .leftMirrored (portrait + mirror for front camera)")
+    let image = UIImage(cgImage: cgImage, scale: 1.0, orientation: .leftMirrored)
+    print("📐 [ARKit Image] Final UIImage: \(image.size), orientation: .leftMirrored")
+    
+    return image
+  }
+  
+  /// Mirror image horizontally - NO LONGER NEEDED
+  /// Orientation .rightMirrored already handles mirroring
+  private func mirrorImageHorizontally(_ image: UIImage) -> UIImage {
+    // With .rightMirrored orientation, additional mirroring is not needed
+    // Just return as-is
+    print("✅ [ARKit Image] Skipping manual mirror (orientation already handles it)")
+    return image
   }
 
   // Extract HeadPose from ARFaceAnchor

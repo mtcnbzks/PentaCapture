@@ -134,20 +134,18 @@ class StorageService: ObservableObject {
     }
   }
 
-  /// Get image data in best available format
-  /// Prefers HEIC (already captured in this format), falls back to JPEG
+  /// Get image data in JPEG format with maximum quality
+  /// Per user requirement: Use JPEG instead of HEIF for better compatibility
+  /// Compression quality: 0.95 (maximum quality while keeping reasonable file size)
   private func getImageData(from image: UIImage) -> Data? {
-    // First try HEIC conversion (preserves original HEIC format)
-    if #available(iOS 11.0, *),
-      let heicData = image.heicData(compressionQuality: 0.9)
-    {
-      print("💾 Saving photo in HEIC format")
-      return heicData
-    }
-
-    // Fallback to high-quality JPEG
-    print("💾 Saving photo in JPEG format (fallback)")
-    return image.jpegData(compressionQuality: 0.9)
+    // JPEG format with maximum quality (0.95)
+    // Per Apple docs: Values 0.8-1.0 are considered "high quality"
+    // We use 0.95 for optimal quality/size balance
+    // - 1.0 = no compression (huge files, minimal quality gain)
+    // - 0.95 = near-lossless quality (recommended for professional use)
+    // - 0.9 = high quality (previous default)
+    print("💾 [JPEG] Saving photo with quality: 0.95 (maximum)")
+    return image.jpegData(compressionQuality: 0.95)
   }
 
   /// Save multiple photos to gallery as an album
