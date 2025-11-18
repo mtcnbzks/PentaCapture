@@ -1,266 +1,214 @@
-# PentaCapture - iOS Hair Photography Application
+# PentaCapture
 
-An iOS app developed for the Smile Hair Clinic Hackathon that automatically captures hair/scalp photos from 5 different angles.
+**Smile Hair Clinic Hackathon 2025 - Mobil Uygulama Kategorisi**
 
-## 🎯 Project Goal
+PentaCapture, saç/kafa derisi bölgelerinin 5 kritik açıdan tutarlı ve profesyonel bir şekilde fotoğraflanmasını sağlayan akıllı bir self-capture iOS uygulamasıdır. Uygulama, ARKit yüz takibi, CoreMotion sensörleri ve gelişmiş validasyon algoritmaları kullanarak kullanıcıya rehberlik eder ve doğru pozisyon yakalandığında otomatik olarak fotoğraf çeker.
 
-An intelligent, fully automatic, and guided mobile application that enables users to capture their own photos from 5 critical angles (especially covering hair/scalp areas) without assistance and with consistent positioning.
+> ⚠️ **GEREKSINIM**: Bu uygulama **iOS 17.6+** ve **ARKit Face Tracking**'e tamamen bağımlıdır. **iPhone XR veya daha yeni cihaz gereklidir**. Daha eski iOS sürümleri veya cihazlar desteklenmez.
 
-## ✨ Features
+## 📱 Temel Özellikler
 
-### 5 Critical Angles
+- **5 Açıdan Otomatik Çekim**: Ön yüz, sağ/sol profil (45°), tepe (vertex) ve arka donör bölgesi
+- **Akıllı Kılavuz**: Real-time validasyon, ProximityIndicator, ses/haptic feedback, Vertex/Donor için video talimatlar
+- **Otomatik Deklanşör**: 0.5s stabilite kontrolü, 2-1 / 3-2-1 countdown, hareket algılandığında iptal
+- **Session Management**: Auto-save, kaldığın yerden devam, attempts/timeSpent/validationScores takibi
+- **ML-Ready Export**: Validation scores + device pose + session analytics içeren JSON çıktı
 
-1. **Full Face Front** - Front view of the face
-2. **45° Right Profile** - Front and right side of the face
-3. **45° Left Profile** - Front and left side of the face
-4. **Vertex (Top)** - Crown area of the scalp
-5. **Donor Area (Back)** - Upper nape and back side areas
+## 🏗️ Teknik Mimari
 
-### Main Features
+PentaCapture, **MVVM + servis katmanı + SwiftUI** yazılım mimarisi üzerinde kuruludur. Her bileşen tek bir sorumluluğa odaklanır ve Combine/async-await ile birbirine bağlanır.
 
-#### 🤖 Automatic Shutter
+### Katmanlar & Akış
 
-- Automatic capture when phone angle and face/head position are correct
-- Countdown timer for user preparation
-- Manual capture option available
+1. **ViewModels/**
 
-#### 📐 Smart Position Guide
+   - `CaptureViewModel`: Oturum state'ini (`CaptureSession`), güncel validasyonu (`PoseValidation`), countdown akışını ve UI flag'lerini yönetir.
+   - Servisleri dependency injection ile alır ve yaşam döngülerini yönetir (`startSession`, `pause`, `resume`, `end`).
+   - `performValidation()` metodunda ARKit + CoreMotion verilerini her 67 ms'de bir birleştirir, Combine ile UI'ı günceller, uygun durumda `triggerAutoCapture()` çağırır.
 
-- **Phone Angle Detection**: Real-time angle measurement with CoreMotion
-- **Face/Head Detection**: Face and head region recognition with Vision Framework
-- **Distance Control**: Distance validation for optimal photo size
-- **Center Alignment**: Center position control with bounding box
+2. **Services/**
 
-#### 🎨 Visual Feedback
+   - `FaceTrackingService` (ARKit): TrueDepth camera + `ARSession` yönetir, `currentHeadPose`, tracking state, high-res AR frame üretir.
+   - `MotionService` (CoreMotion): `CMMotionManager` ile pitch/roll/yaw, gravity, tilt hesaplar; vertex/donor validasyonu için kritik.
+   - `CameraService` (AVFoundation): Capture pipeline'ı kurar, ARKit high-res frame → JPEG dönüşümünü yönetir, iOS 17 performans özelliklerini açar.
+   - `AudioFeedbackService`: Ses + haptic pattern'larını yönetir; proximity, countdown, success, error tonlarını tetikler.
+   - `StorageService`: Photos framework entegrasyonu, albüm oluşturma, paylaşım.
+   - `SessionPersistenceService`: Session auto-save/restore, `Application Support` klasöründe metadata JSON saklar.
 
-- Color-coded status indicators (Red → Yellow → Green)
-- Semi-transparent silhouette guides
-- Progress indicators and metrics
-- Real-time validation messages
+3. **Models/**
 
-#### 🔊 Audio and Haptic Feedback
+   - `CaptureAngle`: Her açı için hedef pitch/yaw/roll, toleranslar, talimat metinleri, SF Symbol id'leri.
+   - `CaptureSession`: Aktif açı, çekilen foto listesi, skorlar, zaman/deneme istatistikleri, device info, ML metadata.
+   - `PoseValidation`: Orientation/detection/stability durumlarını ayrı ayrı tutar, `ValidationStatus` üretir (`invalid`, `adjusting`, `valid`, `locked`).
 
-- Proximity sound (tone increases as you approach target position)
-- Countdown beep sounds
-- Success sounds
-- Haptic feedback
+4. **Views/**
+   - `CaptureFlowView`: Kamera önizleme + overlay bileşenlerini (ProximityIndicator, Countdown, ValidationFeedback, SuccessFlash) kompozit eder.
+   - `VideoInstructionView`: Vertex/Donor için otomatik video rehberi (AVPlayer + Lottie benzeri overlay).
+   - `ProximityIndicator`, `CountdownView`, `AudioToggle`, `AngleTransition` gibi component'ler SwiftUI ile reusable şekilde yazılmıştır.
 
-#### 📱 User Experience
+### Veri Akışı
 
-- Turkish interface and guidance
-- Onboarding/Tutorial screen
-- Photo review and retake
-- Save to gallery
-- Progress tracking (how many of 5 photos captured)
+1. Kamera açıldığında FaceTrackingService ve MotionService eşzamanlı başlar.
+2. Servislerden gelen veriler Combine ile CaptureViewModel'e akar, `performValidation` ile normalize edilir.
+3. `PoseValidation` durumu SwiftUI view'larına publish edilir; kullanıcı doğru açıya yaklaştığında audio/haptic feedback artar.
+4. `locked` state'i yakalandığında countdown tetiklenir, CameraService ARKit high-res frame'i yakalar, StorageService kaydeder, SessionPersistence günceller.
 
-## 🏗️ Architecture
+## 🎯 Zorlu Açılardaki Kılavuzlama Mekanizması
 
-### MVVM Pattern
+Vertex (tepe) ve Donor Area (arka donör) açıları, kullanıcı telefonu başının üstüne/arkasına taşıdığı için hem UX hem de teknik açıdan en kritik kısımdır. PentaCapture bu süreci aşağıdaki bileşenlerle yönetir:
 
-```
-PentaCapture/
-├── Models/                    # Data models
-│   ├── CaptureAngle.swift    # 5 angle definitions and requirements
-│   ├── CaptureSession.swift  # Session management
-│   └── PoseValidation.swift  # Validation metrics
-│
-├── Services/                  # Business logic services
-│   ├── CameraService.swift   # AVFoundation camera control
-│   ├── MotionService.swift   # CoreMotion motion tracking
-│   ├── VisionService.swift   # Vision Framework face/head detection
-│   ├── AudioFeedbackService.swift  # Audio feedback
-│   └── StorageService.swift  # Photo storage
-│
-├── ViewModels/               # Presentation logic
-│   └── CaptureViewModel.swift # Main coordinator
-│
-└── Views/                    # SwiftUI views
-    ├── Capture/             # Capture screens
-    ├── Review/              # Review screens
-    ├── Onboarding/          # Onboarding screens
-    └── Components/          # Reusable components
+### 1. Video Talimat Katmanı
+
+- `VideoInstructionView`, Vertex için `instruction_short.mov`, Donor için `instruction_long.mov` kliplerini otomatik oynatır.
+- `CaptureViewModel`, açı değiştiğinde `videoFileNameForAngle()` ile video gereksinimini kontrol eder; gerekiyorsa validasyon döngüsünü duraklatır, kamera preview'u aktif tutar (pre-warm).
+- Kullanıcı videoyu tekrar oynatabilir, 2 saniye sonra “Atla” butonu çıkar, böylece uzman kullanıcılar gecikme yaşamaz.
+
+### 2. Multi-Sensor Fusion (ARKit + CoreMotion)
+
+```swift
+if let headPose = faceTracking.currentHeadPose {
+    // Vertex: pitch ≈ 0°, Donor: yaw devre dışı
+    validate(headPose: headPose)
+} else if let device = motion.currentOrientation {
+    // Yüz frame'de değilse CoreMotion'a geç
+    validate(devicePitch: device.pitchDegrees, deviceRoll: device.rollDegrees)
+}
 ```
 
-### Technology Stack
+- **Vertex**: Yüz görünüyorsa ARKit pitch 0° ± 10°; yüz görünmüyorsa CoreMotion pitch 90° ± 20°, roll toleransı geniş.
+- **Donor Area**: CoreMotion pitch 165° ± 40°, roll ±180° ± 40°. Yüzün görünmemesi normal kabul edilip sadece IMU verisi kullanılır.
+- **Fusion Mantığı**: ARKit önceliklidir; tracking kaybedildiğinde otomatik CoreMotion'a düşer, kullanıcı bunu fark etmez.
 
-- **SwiftUI**: Modern UI framework
-- **AVFoundation**: Camera control and photo capture
-- **Vision**: Face and head detection
-- **CoreMotion**: Device orientation tracking
-- **Combine**: Reactive data flow
-- **Photos**: Gallery integration
+### 3. Adaptif Tolerance Tablosu
 
-## 🔧 Setup
+| Açı              | Pitch Toleransı | Yaw Toleransı | Roll Toleransı       | Not                             |
+| ---------------- | --------------- | ------------- | -------------------- | ------------------------------- |
+| Front/Right/Left | ±15°            | ±15°          | Serbest              | Kamera önündeki klasik çekim    |
+| Vertex           | ±20°            | —             | Serbest              | Telefon dik, yüz görünmeyebilir |
+| Donor            | ±40°            | —             | ±40° (±180° çevresi) | Başın arkası, en esnek senaryo  |
 
-### Requirements
+Toleranslar `CaptureAngle` enum'u içinde saklanır, metadata'da gerçek hata payı kaydedilir (ML için kalibrasyon verisi).
 
-- Xcode 15.0+
-- iOS 16.0+
-- iPhone (real device recommended - for camera and sensors)
+### 4. Görsel Rehberlik: ProximityIndicator
 
-### Steps
+- SwiftUI tabanlı circular progress ring; pitch/roll/centering skorlarının ortalamasıyla beslenir.
+- Renk Kodları:
+  - **0-30% (Kırmızı)**: “Pozisyon ayarla”
+  - **30-60% (Turuncu)**: “Yaklaşıyorsun”
+  - **60-85% (Sarı)**: “Neredeyse hazır”
+  - **85-100% (Yeşil)**: “Mükemmel, sabit kal”
+- Vertex/Donor sırasında yüz merkezde olmayabileceği için centering faktörü otomatik devre dışı bırakılır.
 
-1. Clone the project:
+### 5. Ses + Haptic Feedback
 
-```bash
-git clone <repository-url>
-cd PentaCapture
-```
+- **Proximity Sound**: 250-700 Hz arasında sinyal üretir; pitch hata payı azaldıkça frekans yükselir, radar benzeri hissiyat verir.
+- **Countdown Sesleri**: 3-2-1 için farklı tonlar + haptic intensities (`soft`, `medium`, `rigid`).
+- **Haptic Escalation**: >70% soft, >85% medium, >95% rigid pattern; kullanıcı ekranı görmüyorsa bile doğru açıya yaklaştığını hisseder.
 
-2. Open with Xcode:
+### 6. Stabilite ve Hareket Algılama
 
-```bash
-open PentaCapture.xcodeproj
-```
+- `PoseValidation` “valid” olduktan sonra en az 0.5 saniye stabil olma şartı aranır; `stabilityDuration` Combine ile izlenir.
+- Countdown sırasında `lockedPose` kaydedilir, her 100 ms'de bir güncel head pose ile karşılaştırılır; yaw/pitch farkı 8°'yi aşarsa countdown iptal edilir ve kullanıcı uyarılır.
+- Bu mekanizma bulanık fotoğraf riskini azaltır, kullanıcıya ikinci şans sunar.
 
-3. Select your development team (Signing & Capabilities)
+### 7. Hızlandırılmış Akış (Scenario-Based Countdown)
 
-4. Run on a real iOS device (simulator has limited camera access)
+- Front/Right/Left açılarında countdown 2-1 (0.7 s interval) çalışır, toplam ~2.5 s; kullanıcı hızlıca ilerler.
+- Vertex/Donor açılarında 3-2-1 (1.0 s interval) uygulanır, toplam ~3.5 s; kullanıcıya cihazı stabilize etmesi için daha uzun pencere verilir.
+- Başarılı çekim sonrasında success flash + triple haptic ile kullanıcı bilgilendirilir, `CaptureSession` bir sonraki açıya geçer.
 
-## 📋 Permissions
+## 📊 Validation Algoritması
 
-The app requires the following permissions:
+**Multi-Sensor Fusion** yaklaşımı ile 15 FPS (67ms) validasyon döngüsü:
 
-- **Camera Access**: For taking photos
-- **Photo Library**: For saving photos
-- **Motion Sensors**: For detecting phone angle
+**1. Data Collection**
 
-All permissions are defined with descriptions in the `Info.plist` file.
+- ARKit: Head pose (pitch, yaw, roll), face position, tracking state
+- CoreMotion: Device orientation (pitch, roll, yaw), gravity, tilt angle
 
-## 🎯 Usage Flow
+**2. Validation Steps**
 
-1. **Onboarding**: First launch shows 5 angles and usage instructions
-2. **Angle 1-5 Loop**: For each angle:
-   - Angle instructions are displayed
-   - User positions the phone correctly
-   - Visual and audio feedback provides guidance
-   - Automatic capture starts when position is correct
-   - Photo is taken after countdown
-3. **Review**: Review screen opens when all photos are captured
-4. **Save**: User can save photos to gallery or share
+- **Orientation Check**: Yüz/telefon açısı hedef değere uygun mu? (tolerans dahilinde)
+- **Detection Check**: Yüz merkezde mi? (ilk 3 açı için, offset < 0.5)
+- **Stability Check**: 0.5 saniye boyunca stabil mi?
 
-## 🔑 Critical Features and Algorithm
+**3. Status Determination**
 
-### Automatic Capture Logic
+- `invalid`: Kriterler karşılanmıyor
+- `adjusting(progress)`: İlerleme var, henüz tamamlanmadı
+- `valid`: Tüm kriterler karşılandı
+- `locked`: Stabil ve otomatik çekim için hazır
 
-For automatic photo capture, **all** criteria must be met simultaneously:
+**4. Auto-Capture Trigger**
 
-1. ✅ **Device Angle**: Within ±5-10° of target pitch angle
-2. ✅ **Face/Head Detection**: Detected by Vision Framework
-3. ✅ **Size**: Detection covers 30-50% of frame
-4. ✅ **Center**: Bounding box center is within 15% of frame center
-5. ✅ **Stability**: Motionless for 0.5 seconds
+- Status `locked` olduğunda 3 saniyelik geri sayım başlar
+- Kullanıcı hareket ederse geri sayım iptal olur
 
-### Validation States
+## 🔧 Teknolojiler
 
-- **Invalid** (Red): Criteria not met
-- **Adjusting** (Orange/Yellow): Getting close but not yet
-- **Valid** (Yellow): Correct position, waiting for stability
-- **Locked** (Green): All criteria met, capture starting
+**Frameworks**: SwiftUI, ARKit (Face Tracking), CoreMotion (IMU), AVFoundation, Photos, Combine, CoreImage
 
-## 🎨 UI/UX Best Practices
+**Gereksinimler**:
 
-### Visual Design
+- iOS 17.6+ (ZORUNLU)
+- iPhone XR+ (TrueDepth/Face ID gerekli)
+- Desteklenmeyen: iPhone X (iOS 17.6 yok), iPhone 8-, iPad (Face ID yok), iPhone SE
 
-- ✅ Minimalist interface - camera first
-- ✅ High contrast - visible in all lighting
-- ✅ Dark mode support
-- ✅ Accessibility (VoiceOver, Dynamic Type)
+**Dependencies**: Hiçbir 3rd party dependency yok, tamamen native iOS frameworks
 
-### User Experience
+## 📁 Proje Yapısı
 
-- ✅ Clear and understandable guidance (Turkish)
-- ✅ Real-time feedback
-- ✅ Error tolerance (manual capture option)
-- ✅ Progress indicators
-- ✅ Easy retake
+MVVM mimarisi ile modüler organizasyon:
 
-### Performance
+- **ViewModels/** - CaptureViewModel (main orchestrator)
+- **Models/** - CaptureAngle, CaptureSession, PoseValidation
+- **Services/** - Camera, FaceTracking, Motion, AudioFeedback, Storage, SessionPersistence
+- **Views/** - Onboarding, Capture (CaptureFlow, ARKitPreview, Overlays), Components (Countdown, ProximityIndicator, VideoInstruction), Review
+- **Helpers/** - Utility functions, coordinate transforms
+- **Assets/** - Video tutorials (instruction_short.mov, instruction_long.mov)
 
-- ✅ Frame processing throttling (15 fps)
-- ✅ Heavy processing on background threads
-- ✅ Memory management
-- ✅ Battery optimization
+## 🎨 UI/UX Tasarım
 
-## 🧪 Test Scenarios
+**Modern & Minimal**: Glassmorphism, dark theme, SF Symbols, spring animations
 
-### Functional Tests
+**Accessible**: 44x44pt touch targets, high contrast, multi-modal feedback
 
-- [ ] Photo capture from all 5 angles
-- [ ] Automatic shutter functionality
-- [ ] Manual capture
-- [ ] Photo review and retake
-- [ ] Save to gallery
+**Performant**: 60 FPS, lazy loading, background processing, memory safe
 
-### Edge Cases
+## 📊 Metadata & ML Integration
 
-- [ ] Low light conditions
-- [ ] Fast movement
-- [ ] Face detection failure
-- [ ] Too far/close distance
-- [ ] Permission denial
+Her fotoğraf için detaylı metadata toplanır:
 
-## 📊 Performance Metrics
+- **Session Info**: session_id, device_info, timestamp
+- **Validation Scores**: pitch_accuracy, yaw_accuracy, centering_accuracy, stability_score, overall_score
+- **Device Pose**: device_pitch/roll/yaw/tilt, head_pitch/yaw/roll
+- **Capture Stats**: attempt_count, time_spent_seconds, image dimensions
 
-- **Validation Latency**: <100ms
-- **Frame Processing**: ~15 fps
-- **Stability Duration**: 0.5 seconds
-- **Photo Quality**: High-resolution HEVC
+Export: `session.exportMetadataJSON()` veya `session.exportAsJSON(includeImages: true)` ile JSON formatında çıktı alınabilir.
 
-## 🚀 Future Enhancements
+## 🧪 Test & Debug
 
-- [ ] Backend integration (photo upload)
-- [ ] AI-powered hair analysis
-- [ ] Multi-language support
-- [ ] iPad support
-- [ ] Automatic dark mode switching
-- [ ] Cloud backup
+**Debug Overlay**: Settings'den açılabilir - ARKit tracking state, face pose values, FPS counter
 
-## 👥 Developer Notes
+**Common Issues**:
 
-### Debug Mode
+- ⚠️ **ARKit hatası**: iPhone XR+ cihaz, iOS 17.6+, Face ID aktif, fiziksel cihaz gerekli
+- **Fotoğraf çekilmiyor**: Kamera izni, ARKit tracking "Normal", yüz tespit kontrolü
+- **Validation başarısız**: Telefon açısı, yüz merkezde, 0.5s stabil tutma
+- **Yavaş performance**: iOS 17.6+, background apps kapatma, iPhone 11 Pro+ optimal
 
-Useful debug information during development:
+## 🎯 Hackathon Kriterleri
 
-- Camera angle values logged to console
-- Vision detection confidence displayed
-- Validation metrics visible in UI
+✅ **Temel Özellikler**: 5 açıdan otomatik çekim, ARKit+CoreMotion fusion, otomatik deklanşör, tutarlı çekimler
 
-### Customization
+✅ **Zorlu Açılar Çözümü**: Video talimatlar, multi-sensor fusion, geniş tolerance (±40°), görsel rehberlik, ses/haptic feedback
 
-- `CaptureAngle.swift`: Angle requirements can be adjusted
-- `ValidationMetrics.swift`: Threshold values can be modified
-- `AudioFeedbackService.swift`: Audio tones can be customized
+✅ **UX/UI**: Minimal modern tasarım, hızlı akış, session auto-save, onboarding, review screen
 
-## 📄 License
+✅ **Teknik Stabilite**: MVVM modüler mimari, memory management, error handling, 60 FPS, iOS 17.6+ optimizations, offline support
 
-This project was developed for the Smile Hair Clinic Hackathon.
-
-## 🏆 Hackathon Criteria
-
-### User Experience (UX/UI) ✅
-
-- Self-capture of Vertex and Donor areas made easier
-- Intuitive usage with visual guides and audio feedback
-
-### Guidance Mechanism ✅
-
-- Real-time visual feedback (color-coded)
-- Silhouette and bounding box guides
-- Progress percentage display
-
-### Technical Stability ✅
-
-- Fast and reliable position detection with gyroscope/accelerometer
-- High accuracy face/head detection with Vision Framework
-- Optimized performance with throttling
-
-### Consistency ✅
-
-- Defined target metrics for each angle
-- Standardized validation criteria
-- Repeatable photo quality
+✅ **Tutarlılık Algoritması**: Precise targets, metadata tracking, ML-ready export
 
 ---
 
-**Note**: This application is a real hackathon project and may require additional security, testing, and optimization for production use.
+**PentaCapture** - Saç/Kafa Derisi Fotoğrafı için Profesyonel Self-Capture Çözümü 📸
