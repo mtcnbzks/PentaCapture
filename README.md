@@ -55,27 +55,27 @@ PentaCapture, **MVVM + servis katmanı + SwiftUI** yazılım mimarisi üzerinde 
 
 Vertex (tepe) ve Donor Area (arka donör) açıları, kullanıcı telefonu başının üstüne/arkasına taşıdığı için hem UX hem de teknik açıdan en kritik kısımdır. PentaCapture bu süreci aşağıdaki bileşenlerle yönetir:
 
-### 1. Video Talimat Katmanı
+### 1. Multi-Sensor Fusion (ARKit + CoreMotion)
 
-- `VideoInstructionView`, Vertex için `instruction_short.mov`, Donor için `instruction_long.mov` kliplerini otomatik oynatır.
-- `CaptureViewModel`, açı değiştiğinde `videoFileNameForAngle()` ile video gereksinimini kontrol eder; gerekiyorsa validasyon döngüsünü duraklatır, kamera preview'u aktif tutar (pre-warm).
-- Kullanıcı videoyu tekrar oynatabilir, 2 saniye sonra “Atla” butonu çıkar, böylece uzman kullanıcılar gecikme yaşamaz.
+İlk 3 senaryoda (Ön Yüz, Sağ Profil, Sol Profil), Apple'ın **Face ID** teknolojisinde kullandığı **TrueDepth** kamera sistemi ve **ARKit** altyapısı kullanılarak yüksek hassasiyetli yüz takibi yapılır. Bu sayede milimetrik sapmalar bile tespit edilebilir. Ancak zorlu açılarda bu teknoloji yetersiz kalabildiği için hibrit bir yapı kurulmuştur:
 
-### 2. Multi-Sensor Fusion (ARKit + CoreMotion)
+**Hibrit Takip Mantığı (Hybrid Tracking Logic):**
 
-```swift
-if let headPose = faceTracking.currentHeadPose {
-    // Vertex: pitch ≈ 0°, Donor: yaw devre dışı
-    validate(headPose: headPose)
-} else if let device = motion.currentOrientation {
-    // Yüz frame'de değilse CoreMotion'a geç
-    validate(devicePitch: device.pitchDegrees, deviceRoll: device.rollDegrees)
-}
-```
+Sistem, kesintisiz bir deneyim için iki farklı sensör verisini dinamik olarak birleştirir:
+
+1.  **Öncelikli Kaynak (ARKit):** Kamera görüş alanında yüz tespit edildiği sürece (genellikle Ön, Sağ ve Sol açılar), sistem öncelikli olarak ARKit verilerini kullanır. Bu, en yüksek hassasiyeti sağlar.
+2.  **Yedek Kaynak (CoreMotion):** Kullanıcı telefonu başının üzerine (Vertex) veya arkasına (Donor) götürdüğünde yüz kameradan çıkabilir. Bu anda sistem otomatik ve kesintisiz olarak cihazın ivmeölçer ve jiroskop (IMU) sensörlerine geçer.
+3.  **Akıllı Geçiş:** Kullanıcı bu geçişi hissetmez. Yüz tekrar kadraja girdiğinde sistem anında tekrar ARKit hassasiyetine döner. Bu sayede her senaryoda (yüz görünse de görünmese de) doğru açı rehberliği devam eder.
 
 - **Vertex**: Yüz görünüyorsa ARKit pitch 0° ± 10°; yüz görünmüyorsa CoreMotion pitch 90° ± 20°, roll toleransı geniş.
 - **Donor Area**: CoreMotion pitch 165° ± 40°, roll ±180° ± 40°. Yüzün görünmemesi normal kabul edilip sadece IMU verisi kullanılır.
 - **Fusion Mantığı**: ARKit önceliklidir; tracking kaybedildiğinde otomatik CoreMotion'a düşer, kullanıcı bunu fark etmez.
+
+### 2. Video Talimat Katmanı
+
+- `VideoInstructionView`, Vertex için `instruction_short.mov`, Donor için `instruction_long.mov` kliplerini otomatik oynatır.
+- `CaptureViewModel`, açı değiştiğinde `videoFileNameForAngle()` ile video gereksinimini kontrol eder; gerekiyorsa validasyon döngüsünü duraklatır, kamera preview'u aktif tutar (pre-warm).
+- Kullanıcı videoyu tekrar oynatabilir, 2 saniye sonra “Atla” butonu çıkar, böylece uzman kullanıcılar gecikme yaşamaz.
 
 ### 3. Adaptif Tolerance Tablosu
 
