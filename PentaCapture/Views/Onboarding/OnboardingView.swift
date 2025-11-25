@@ -151,7 +151,9 @@ struct OnboardingView: View {
               RoundedRectangle(cornerRadius: 14)
                 .fill(
                   LinearGradient(
-                    colors: isNextButtonEnabled ? [Color.blue, Color.blue.opacity(0.8)] : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)],
+                    colors: isNextButtonEnabled
+                      ? [Color.blue, Color.blue.opacity(0.8)]
+                      : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                   )
@@ -178,19 +180,19 @@ struct OnboardingView: View {
     let photoStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
     photoLibraryPermissionGranted = (photoStatus == .authorized || photoStatus == .limited)
   }
-  
+
   // Check if next/start button should be enabled
   private var isNextButtonEnabled: Bool {
     let currentPageData = pages[currentPage]
-    
+
     // If current page needs camera permission, require it
     if currentPageData.needsCameraPermission && !cameraPermissionGranted {
       return false
     }
-    
+
     // Photo library permission is optional - don't block user
     // They can grant it later when saving to gallery
-    
+
     return true
   }
 }
@@ -271,7 +273,7 @@ struct OnboardingPageView: View {
           )
         }
       }
-      .frame(height: 100) // Fixed height for permission area
+      .frame(height: 100)  // Fixed height for permission area
       .padding(.horizontal, 32)
       .padding(.top, 24)
 

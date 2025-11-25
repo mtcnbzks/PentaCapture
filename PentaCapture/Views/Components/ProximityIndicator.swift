@@ -23,12 +23,14 @@ struct ProximityIndicator: View {
   var body: some View {
     ZStack {
       Circle()
-        .fill(RadialGradient(
-          colors: [progressColor.opacity(0.3), .clear],
-          center: .center,
-          startRadius: 40,
-          endRadius: 60
-        ))
+        .fill(
+          RadialGradient(
+            colors: [progressColor.opacity(0.3), .clear],
+            center: .center,
+            startRadius: 40,
+            endRadius: 60
+          )
+        )
         .frame(width: 120, height: 120)
 
       Circle()

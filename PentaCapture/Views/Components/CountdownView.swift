@@ -23,12 +23,14 @@ struct CountdownWithMessageView: View {
   var body: some View {
     ZStack {
       Circle()
-        .fill(RadialGradient(
-          colors: [countdownColor.opacity(0.4), .clear],
-          center: .center,
-          startRadius: 60,
-          endRadius: 100
-        ))
+        .fill(
+          RadialGradient(
+            colors: [countdownColor.opacity(0.4), .clear],
+            center: .center,
+            startRadius: 60,
+            endRadius: 100
+          )
+        )
         .frame(width: 200, height: 200)
         .scaleEffect(scale * 1.2)
 
@@ -41,11 +43,13 @@ struct CountdownWithMessageView: View {
 
       Text("\(countdown)")
         .font(.system(size: 70, weight: .bold, design: .rounded))
-        .foregroundStyle(LinearGradient(
-          colors: [.white, countdownColor.opacity(0.8)],
-          startPoint: .top,
-          endPoint: .bottom
-        ))
+        .foregroundStyle(
+          LinearGradient(
+            colors: [.white, countdownColor.opacity(0.8)],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
         .shadow(color: countdownColor.opacity(0.8), radius: 15)
         .scaleEffect(scale)
     }

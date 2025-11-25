@@ -279,7 +279,7 @@ class CaptureSession: ObservableObject {
       angleStats[angle] = AngleCaptureStats(angle: angle)
     }
   }
-  
+
   /// Initialize with saved session data (for restore)
   init(
     sessionId: UUID,

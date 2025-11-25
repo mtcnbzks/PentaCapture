@@ -8,8 +8,8 @@
 import ARKit
 import Combine
 import CoreImage
-import simd
 import UIKit
+import simd
 
 struct HeadPose: Equatable {
   let yaw: Double
@@ -64,7 +64,7 @@ class FaceTrackingService: NSObject, ObservableObject {
   nonisolated(unsafe) let isSupported: Bool
   let arSession = ARSession()  // Public - ARSCNView için gerekli
   private var frameCount = 0
-  
+
   // Idle timer management - auto-enable after 2 minutes
   private var idleTimerTask: Task<Void, Never>?
 
@@ -113,11 +113,11 @@ class FaceTrackingService: NSObject, ObservableObject {
     error = nil
     frameCount = 0
     trackingState = "Starting..."
-    
+
     // Disable idle timer to keep screen on during ARKit tracking
     UIApplication.shared.isIdleTimerDisabled = true
     print("🔆 Screen idle timer disabled - screen will stay on")
-    
+
     // Auto-enable idle timer after 2 minutes
     scheduleIdleTimerReenable()
 
@@ -130,12 +130,12 @@ class FaceTrackingService: NSObject, ObservableObject {
       UIApplication.shared.isIdleTimerDisabled = false
       return
     }
-    
+
     print("⏹️ Stopping ARKit Face Tracking...")
     arSession.pause()
     isTracking = false
     currentHeadPose = nil
-    
+
     // Cancel any pending idle timer re-enable
     cancelIdleTimerReenable()
     // Re-enable idle timer to allow screen to sleep
@@ -147,31 +147,31 @@ class FaceTrackingService: NSObject, ObservableObject {
   private func scheduleIdleTimerReenable() {
     // Cancel any existing task
     cancelIdleTimerReenable()
-    
+
     print("⏱️ Scheduling idle timer re-enable in 2 minutes")
     idleTimerTask = Task { @MainActor in
       // Wait 2 minutes (120 seconds)
       try? await Task.sleep(nanoseconds: 120_000_000_000)
-      
+
       // Check if task was cancelled
       guard !Task.isCancelled else {
         print("⏱️ Idle timer re-enable cancelled")
         return
       }
-      
+
       // Re-enable idle timer after 2 minutes
       UIApplication.shared.isIdleTimerDisabled = false
       print("🌙 Auto re-enabled idle timer after 2 minutes - screen can now sleep")
     }
   }
-  
+
   private func cancelIdleTimerReenable() {
     idleTimerTask?.cancel()
     idleTimerTask = nil
   }
-  
+
   // MARK: - High Resolution Capture (iOS 16+)
-  
+
   /// Capture high-resolution photo directly from ARKit session
   /// This is the BEST approach: 0 latency, 0 race conditions, highest quality
   /// Per Apple WWDC 2022: Use captureHighResolutionFrame for still image capture
@@ -180,30 +180,30 @@ class FaceTrackingService: NSObject, ObservableObject {
     guard isSupported else {
       throw FaceTrackingError.notSupported
     }
-    
+
     guard isTracking else {
       throw FaceTrackingError.sessionFailed
     }
-    
+
     print("📸 [ARKit Capture] Requesting high-resolution frame...")
     let captureStartTime = Date()
-    
+
     return try await withCheckedThrowingContinuation { continuation in
       arSession.captureHighResolutionFrame { [weak self] frame, error in
         let captureLatency = Date().timeIntervalSince(captureStartTime)
         print("📸 [ARKit Capture] Latency: \(String(format: "%.3f", captureLatency))s")
-        
+
         if let error = error {
           let nsError = error as NSError
-          
+
           // Handle specific ARKit capture errors
           if nsError.domain == "com.apple.arkit.error" {
             switch nsError.code {
-            case 101: // highResolutionFrameCaptureInProgress
+            case 101:  // highResolutionFrameCaptureInProgress
               print("❌ [ARKit Capture] Previous capture still in progress")
               continuation.resume(throwing: FaceTrackingError.sessionFailed)
               return
-            case 102: // highResolutionFrameCaptureFailed
+            case 102:  // highResolutionFrameCaptureFailed
               print("❌ [ARKit Capture] Capture failed in pipeline")
               continuation.resume(throwing: FaceTrackingError.sessionFailed)
               return
@@ -213,26 +213,26 @@ class FaceTrackingService: NSObject, ObservableObject {
               return
             }
           }
-          
+
           print("❌ [ARKit Capture] Error: \(error.localizedDescription)")
           continuation.resume(throwing: error)
           return
         }
-        
+
         guard let frame = frame else {
           print("❌ [ARKit Capture] No frame returned")
           continuation.resume(throwing: FaceTrackingError.noFaceDetected)
           return
         }
-        
+
         // Extract high-resolution captured image
         let pixelBuffer = frame.capturedImage
-        
+
         // Get buffer dimensions
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         print("📸 [ARKit Capture] Captured frame: \(width)x\(height)")
-        
+
         // Convert CVPixelBuffer to UIImage
         let processingStartTime = Date()
         guard let image = self?.convertPixelBufferToUIImage(pixelBuffer) else {
@@ -240,29 +240,29 @@ class FaceTrackingService: NSObject, ObservableObject {
           continuation.resume(throwing: FaceTrackingError.sessionFailed)
           return
         }
-        
+
         let processingTime = Date().timeIntervalSince(processingStartTime)
         print("📸 [ARKit Capture] Image conversion: \(String(format: "%.3f", processingTime))s")
         print("📸 [ARKit Capture] Final image size: \(image.size)")
-        
+
         // Mirror horizontally to match preview (front camera)
         let mirroredImage = self?.mirrorImageHorizontally(image) ?? image
         print("✅ [ARKit Capture] High-res capture complete!")
-        
+
         continuation.resume(returning: mirroredImage)
       }
     }
   }
-  
+
   /// Check if high-resolution capture is available
   /// Per Apple docs: Requires iOS 16+ and active ARSession
   @available(iOS 16.0, *)
   var canCaptureHighResolution: Bool {
     return isSupported && isTracking
   }
-  
+
   // MARK: - Image Conversion Helpers
-  
+
   /// Convert CVPixelBuffer to UIImage with proper orientation
   /// Per Apple ARKit docs: "capturedImage pixel buffer is NOT adjusted for device orientation"
   /// ARKit always captures in landscape-right orientation, we need to rotate for portrait
@@ -270,24 +270,24 @@ class FaceTrackingService: NSObject, ObservableObject {
     // Lock the pixel buffer for reading
     CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
     defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
-    
+
     // Get buffer properties
     let width = CVPixelBufferGetWidth(pixelBuffer)
     let height = CVPixelBufferGetHeight(pixelBuffer)
     print("📐 [ARKit Image] CVPixelBuffer (raw camera): \(width)x\(height) (landscape)")
-    
+
     // Create CIImage from pixel buffer
     let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-    
+
     // Create CIContext for rendering (use Metal for better performance)
     let context = CIContext(options: [.useSoftwareRenderer: false])
-    
+
     // Render to CGImage
     guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
       print("❌ Failed to create CGImage from CIImage")
       return nil
     }
-    
+
     // CRITICAL: ARKit camera orientation handling
     // Per Apple Documentation: "capturedImage is NOT adjusted for device orientation"
     // ARKit captures in landscape orientation from front camera
@@ -304,14 +304,14 @@ class FaceTrackingService: NSObject, ObservableObject {
     // - Front camera captures landscape-left naturally
     // - Need 90° CW rotation for portrait (.left)
     // - Need horizontal flip for mirror effect (Mirrored)
-    
+
     print("📐 [ARKit Image] Applying .leftMirrored (portrait + mirror for front camera)")
     let image = UIImage(cgImage: cgImage, scale: 1.0, orientation: .leftMirrored)
     print("📐 [ARKit Image] Final UIImage: \(image.size), orientation: .leftMirrored")
-    
+
     return image
   }
-  
+
   /// Mirror image horizontally - NO LONGER NEEDED
   /// Orientation .rightMirrored already handles mirroring
   private func mirrorImageHorizontally(_ image: UIImage) -> UIImage {

@@ -74,7 +74,8 @@ struct ValidationMetricsView: View {
   var body: some View {
     Group {
       if let currentYaw = validation.orientationValidation.currentYaw,
-         let targetYaw = validation.orientationValidation.targetYaw {
+        let targetYaw = validation.orientationValidation.targetYaw
+      {
         yawMetricContent(currentYaw: currentYaw, targetYaw: targetYaw)
       } else {
         Color.clear
@@ -105,11 +106,13 @@ struct ValidationMetricsView: View {
 
       Text(String(format: "%.0f°", abs(currentYaw)))
         .font(.system(size: 28, weight: .bold, design: .rounded))
-        .foregroundStyle(LinearGradient(
-          colors: [.white, .white.opacity(0.9)],
-          startPoint: .top,
-          endPoint: .bottom
-        ))
+        .foregroundStyle(
+          LinearGradient(
+            colors: [.white, .white.opacity(0.9)],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
         .monospacedDigit()
         .shadow(color: .black.opacity(0.4), radius: 3)
 

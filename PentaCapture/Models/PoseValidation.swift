@@ -51,9 +51,11 @@ struct OrientationValidation {
       }
       if let yawError, let targetYaw, abs(yawError) > 10 {
         if yawError > 0 {
-          return targetYaw > 0 ? "Başınızı daha fazla sağa çevirin" : "Başınızı daha az sağa çevirin"
+          return targetYaw > 0
+            ? "Başınızı daha fazla sağa çevirin" : "Başınızı daha az sağa çevirin"
         } else {
-          return targetYaw < 0 ? "Başınızı daha fazla sola çevirin" : "Başınızı daha az sola çevirin"
+          return targetYaw < 0
+            ? "Başınızı daha fazla sola çevirin" : "Başınızı daha az sola çevirin"
         }
       }
       return pitchError > 0 ? "Telefonu daha yukarı kaldırın" : "Telefonu daha aşağı indirin"
@@ -98,7 +100,8 @@ struct PoseValidation {
 
   var overallStatus: ValidationStatus {
     guard orientationValidation.status.isValid && detectionValidation.status.isValid else {
-      let combinedProgress = (orientationValidation.status.progress + detectionValidation.status.progress) / 2.0
+      let combinedProgress =
+        (orientationValidation.status.progress + detectionValidation.status.progress) / 2.0
       return combinedProgress < 0.1 ? .invalid : .adjusting(progress: combinedProgress)
     }
     return isStable && stabilityDuration >= Self.requiredStabilityDuration ? .locked : .valid

@@ -23,21 +23,25 @@ struct QuickAngleTransition: View {
       VStack(spacing: 24) {
         Text("SIRADAKI")
           .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(LinearGradient(
-            colors: [.blue, .blue.opacity(0.7)],
-            startPoint: .leading,
-            endPoint: .trailing
-          ))
+          .foregroundStyle(
+            LinearGradient(
+              colors: [.blue, .blue.opacity(0.7)],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
           .tracking(3)
 
         ZStack {
           Circle()
-            .fill(RadialGradient(
-              colors: [Color.blue.opacity(0.3), .clear],
-              center: .center,
-              startRadius: 60,
-              endRadius: 90
-            ))
+            .fill(
+              RadialGradient(
+                colors: [Color.blue.opacity(0.3), .clear],
+                center: .center,
+                startRadius: 60,
+                endRadius: 90
+              )
+            )
             .frame(width: 180, height: 180)
             .scaleEffect(glowScale)
 
@@ -49,21 +53,25 @@ struct QuickAngleTransition: View {
 
           Image(systemName: nextAngle.symbolName)
             .font(.system(size: 50, weight: .medium))
-            .foregroundStyle(LinearGradient(
-              colors: [.blue, .cyan],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            ))
+            .foregroundStyle(
+              LinearGradient(
+                colors: [.blue, .cyan],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            )
             .scaleEffect(scale)
         }
 
         Text(nextAngle.title)
           .font(.system(size: 28, weight: .bold))
-          .foregroundStyle(LinearGradient(
-            colors: [.white, .white.opacity(0.9)],
-            startPoint: .top,
-            endPoint: .bottom
-          ))
+          .foregroundStyle(
+            LinearGradient(
+              colors: [.white, .white.opacity(0.9)],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+          )
           .shadow(color: .black.opacity(0.3), radius: 4)
 
         Text(nextAngle.instructions)
@@ -76,11 +84,12 @@ struct QuickAngleTransition: View {
         HStack(spacing: 10) {
           Image(systemName: "arrow.right.circle.fill")
             .font(.system(size: 18))
-            .foregroundStyle(LinearGradient(
-              colors: [.blue, .cyan],
-              startPoint: .leading,
-              endPoint: .trailing
-            ))
+            .foregroundStyle(
+              LinearGradient(
+                colors: [.blue, .cyan],
+                startPoint: .leading,
+                endPoint: .trailing
+              ))
           Text("Hazır olduğunuzda devam edin")
             .font(.system(size: 13, weight: .medium))
             .foregroundColor(.white.opacity(0.7))

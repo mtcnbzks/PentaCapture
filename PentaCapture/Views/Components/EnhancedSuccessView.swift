@@ -14,12 +14,14 @@ struct CompactSuccessView: View {
   var body: some View {
     ZStack {
       Circle()
-        .fill(RadialGradient(
-          colors: [Color.green.opacity(0.4), .clear],
-          center: .center,
-          startRadius: 30,
-          endRadius: 60
-        ))
+        .fill(
+          RadialGradient(
+            colors: [Color.green.opacity(0.4), .clear],
+            center: .center,
+            startRadius: 30,
+            endRadius: 60
+          )
+        )
         .frame(width: 120, height: 120)
         .scaleEffect(glowScale)
 
@@ -31,11 +33,13 @@ struct CompactSuccessView: View {
 
       Image(systemName: "checkmark.circle.fill")
         .font(.system(size: 60, weight: .bold))
-        .foregroundStyle(LinearGradient(
-          colors: [.green, .green.opacity(0.8)],
-          startPoint: .top,
-          endPoint: .bottom
-        ))
+        .foregroundStyle(
+          LinearGradient(
+            colors: [.green, .green.opacity(0.8)],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
         .scaleEffect(scale)
         .shadow(color: .green.opacity(0.8), radius: 12)
     }

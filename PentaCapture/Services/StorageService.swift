@@ -72,9 +72,9 @@ class StorageService: ObservableObject {
     if #available(iOS 14, *) {
       PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
         DispatchQueue.main.async {
-          guard let self = self else { 
+          guard let self = self else {
             completion(false)
-            return 
+            return
           }
           self.authorizationStatus = status
           self.isAuthorized = (status == .authorized || status == .limited)
@@ -82,7 +82,7 @@ class StorageService: ObservableObject {
           if !self.isAuthorized {
             self.error = .unauthorized
           }
-          
+
           // Call completion with authorization result
           completion(self.isAuthorized)
         }
@@ -90,9 +90,9 @@ class StorageService: ObservableObject {
     } else {
       PHPhotoLibrary.requestAuthorization { [weak self] status in
         DispatchQueue.main.async {
-          guard let self = self else { 
+          guard let self = self else {
             completion(false)
-            return 
+            return
           }
           self.authorizationStatus = status
           self.isAuthorized = (status == .authorized)
@@ -100,7 +100,7 @@ class StorageService: ObservableObject {
           if !self.isAuthorized {
             self.error = .unauthorized
           }
-          
+
           // Call completion with authorization result
           completion(self.isAuthorized)
         }
@@ -294,14 +294,14 @@ class StorageService: ObservableObject {
     // WhatsApp and other apps prefer file URLs over UIImage objects
     var fileURLs: [URL] = []
     let tempDir = FileManager.default.temporaryDirectory
-    
+
     for (index, image) in images.enumerated() {
       // Use JPEG format with high quality for sharing
       guard let imageData = image.jpegData(compressionQuality: 0.95) else { continue }
-      
+
       let fileName = "pentacapture_photo_\(index + 1).jpg"
       let fileURL = tempDir.appendingPathComponent(fileName)
-      
+
       do {
         try imageData.write(to: fileURL)
         fileURLs.append(fileURL)
@@ -309,10 +309,10 @@ class StorageService: ObservableObject {
         print("⚠️ Failed to write temp file for sharing: \(error)")
       }
     }
-    
+
     // If no files were created, fall back to images
     let activityItems: [Any] = fileURLs.isEmpty ? images : fileURLs
-    
+
     let activityVC = UIActivityViewController(
       activityItems: activityItems,
       applicationActivities: nil

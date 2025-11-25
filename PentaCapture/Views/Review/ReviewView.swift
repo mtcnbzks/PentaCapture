@@ -284,7 +284,7 @@ struct ReviewView: View {
       performSave()
     }
   }
-  
+
   private func performSave() {
     isSaving = true
 

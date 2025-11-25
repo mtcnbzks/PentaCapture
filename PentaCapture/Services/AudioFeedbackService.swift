@@ -386,7 +386,7 @@ extension AudioFeedbackService {
       break  // No haptic for invalid
     }
   }
-  
+
   /// Play haptic for angle transitions
   func playAngleTransitionHaptic() {
     guard isEnabled else { return }
@@ -394,7 +394,7 @@ extension AudioFeedbackService {
     softHaptic.impactOccurred(intensity: 0.7)
     softHaptic.prepare()
   }
-  
+
   /// Play haptic for successful capture
   func playSuccessHaptic() {
     guard isEnabled else { return }
@@ -406,7 +406,7 @@ extension AudioFeedbackService {
     }
     notificationHaptic.prepare()
   }
-  
+
   /// Play subtle selection haptic
   func playSelectionHaptic() {
     guard isEnabled else { return }

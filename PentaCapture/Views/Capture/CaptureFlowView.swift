@@ -29,7 +29,7 @@ struct CaptureFlowView: View {
             showingVideoInstruction = false
             currentVideoFileName = nil
           }
-          
+
           // OPTIMIZATION: Resume validation only - camera was already running
           // This provides instant readiness since camera was pre-warmed during video
           DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -38,7 +38,7 @@ struct CaptureFlowView: View {
         }
         .zIndex(100)  // Ensure video is on top
       }
-      
+
       // Camera preview
       if viewModel.faceTrackingService.isSupported {
         // Use ARKit camera feed when face tracking is available
@@ -54,7 +54,7 @@ struct CaptureFlowView: View {
       VStack {
         topBar
           .frame(maxWidth: .infinity)
-        
+
         // Instructions for current angle - positioned near top
         if showingInstructions && !viewModel.isCountingDown {
           AngleInstructionView(angle: viewModel.session.currentAngle)
@@ -62,10 +62,10 @@ struct CaptureFlowView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 12)
         }
-        
+
         Spacer()
       }
-      
+
       // Center proximity indicator overlay
       if let validation = viewModel.currentValidation,
         !viewModel.isCountingDown && !viewModel.showSuccess,
@@ -76,10 +76,10 @@ struct CaptureFlowView: View {
           ProximityIndicator(progress: validation.progress)
             .transition(.scale.combined(with: .opacity))
           Spacer()
-            .frame(height: 100) // Space for bottom controls
+            .frame(height: 100)  // Space for bottom controls
         }
       }
-      
+
       // Bottom controls overlay (hidden during countdown)
       VStack {
         Spacer()
@@ -134,7 +134,7 @@ struct CaptureFlowView: View {
       // This is especially important when user just granted permission in onboarding
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
         viewModel.startCapture()
-        
+
         // After starting capture, check if we need to show video for current angle
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
           checkAndShowVideoIfNeeded(for: viewModel.session.currentAngle)
@@ -351,7 +351,8 @@ struct CaptureFlowView: View {
       // Validation feedback - center (moved from top, compact version for bottom controls)
       // Fixed size to prevent layout shifts
       if let validation = viewModel.currentValidation,
-         !viewModel.isCountingDown && !viewModel.showSuccess {
+        !viewModel.isCountingDown && !viewModel.showSuccess
+      {
         ValidationFeedbackView(validation: validation)
           .transition(.opacity)
           .frame(width: 180, height: 50)
@@ -370,9 +371,9 @@ struct CaptureFlowView: View {
     .padding(.horizontal, 56)
     .padding(.bottom, 40)
   }
-  
+
   // MARK: - Angle Transition Helpers
-  
+
   /// Returns the video file name for a given angle, or nil if no video is needed
   private func videoFileNameForAngle(_ angle: CaptureAngle) -> String? {
     switch angle {
@@ -384,7 +385,7 @@ struct CaptureFlowView: View {
       return nil
     }
   }
-  
+
   /// Check if video instruction is needed for this angle and show it
   /// Videos for vertex and donorArea are shown every time the user reaches these angles
   private func checkAndShowVideoIfNeeded(for angle: CaptureAngle) {
@@ -395,7 +396,7 @@ struct CaptureFlowView: View {
         // OPTIMIZATION: Pause validation only - camera stays running for pre-warming
         // This reduces camera warmup time when transition ends
         viewModel.pauseValidation()
-        
+
         withAnimation {
           showingAngleTransition = true
           angleTransitionStartTime = Date()
@@ -404,14 +405,14 @@ struct CaptureFlowView: View {
       }
       return
     }
-    
+
     // Show video instruction every time for vertex and donorArea
     print("📹 Showing video instruction for \(angle.title): \(videoFileName)")
-    
+
     // OPTIMIZATION: Pause validation only - camera stays running for pre-warming
     // This keeps camera ready for faster capture after video
     viewModel.pauseValidation()
-    
+
     // Show video after a brief delay
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
       withAnimation {
@@ -420,28 +421,29 @@ struct CaptureFlowView: View {
       }
     }
   }
-  
+
   /// Angle transition'ı kapatmak için kontrol eder
   /// 1.5 saniye sonra otomatik olarak kapatır
   private func checkAngleTransitionDismiss() {
     guard showingAngleTransition else { return }
-    
+
     // Minimum 1.5 saniye geçmiş mi?
     guard let startTime = angleTransitionStartTime,
-          Date().timeIntervalSince(startTime) >= 1.5 else {
+      Date().timeIntervalSince(startTime) >= 1.5
+    else {
       // Henüz 1.5 saniye geçmemiş, 0.2 saniye sonra tekrar kontrol et
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
         checkAngleTransitionDismiss()
       }
       return
     }
-    
+
     // 1.5 saniye geçti - transition'ı kapat ve validasyonu resume et
     withAnimation {
       showingAngleTransition = false
       angleTransitionStartTime = nil
     }
-    
+
     // OPTIMIZATION: Resume validation only - camera was already running
     // This provides instant readiness since camera was pre-warmed
     viewModel.resumeValidation()
@@ -522,7 +524,7 @@ struct DebugOverlayView: View {
             .font(.system(size: 9, weight: .bold, design: .monospaced))
             .foregroundColor(.cyan)
         }
-        
+
         HStack(spacing: 6) {
           Text("P")
             .font(.system(size: 8, weight: .medium))

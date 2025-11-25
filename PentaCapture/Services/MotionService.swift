@@ -44,7 +44,8 @@ enum MotionError: LocalizedError {
 
   var recoverySuggestion: String? {
     switch self {
-    case .notAvailable: "Bu cihazda gyroscope veya ivmeölçer bulunamadı. Lütfen farklı bir cihaz kullanın."
+    case .notAvailable:
+      "Bu cihazda gyroscope veya ivmeölçer bulunamadı. Lütfen farklı bir cihaz kullanın."
     case .failedToStart: "Hareket sensörleri başlatılamadı. Lütfen uygulamayı yeniden başlatın."
     }
   }

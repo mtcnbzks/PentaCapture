@@ -39,27 +39,25 @@ struct AngleIndicator: View {
   let isCaptured: Bool
 
   private var backgroundColor: Color {
-    if isCaptured { .green }
-    else if isCurrent { .blue }
-    else { .gray.opacity(0.3) }
+    if isCaptured { .green } else if isCurrent { .blue } else { .gray.opacity(0.3) }
   }
 
   private var shadowColor: Color {
-    if isCaptured { .green.opacity(0.6) }
-    else if isCurrent { .blue.opacity(0.6) }
-    else { .clear }
+    if isCaptured { .green.opacity(0.6) } else if isCurrent { .blue.opacity(0.6) } else { .clear }
   }
 
   var body: some View {
     ZStack {
       if isCurrent {
         Circle()
-          .fill(RadialGradient(
-            colors: [Color.blue.opacity(0.4), .clear],
-            center: .center,
-            startRadius: 16,
-            endRadius: 24
-          ))
+          .fill(
+            RadialGradient(
+              colors: [Color.blue.opacity(0.4), .clear],
+              center: .center,
+              startRadius: 16,
+              endRadius: 24
+            )
+          )
           .frame(width: 48, height: 48)
       }
 
