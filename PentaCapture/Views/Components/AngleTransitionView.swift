@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-/// Modern quick transition view with glassmorphism
 struct QuickAngleTransition: View {
   let nextAngle: CaptureAngle
 
@@ -17,74 +16,56 @@ struct QuickAngleTransition: View {
 
   var body: some View {
     ZStack {
-      // Blurred background
       Color.black.opacity(0.7)
         .background(.ultraThinMaterial)
         .ignoresSafeArea()
 
       VStack(spacing: 24) {
-        // "Sıradaki" başlığı
         Text("SIRADAKI")
           .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(
-            LinearGradient(
-              colors: [Color.blue, Color.blue.opacity(0.7)],
-              startPoint: .leading,
-              endPoint: .trailing
-            )
-          )
+          .foregroundStyle(LinearGradient(
+            colors: [.blue, .blue.opacity(0.7)],
+            startPoint: .leading,
+            endPoint: .trailing
+          ))
           .tracking(3)
 
-        // Icon with modern styling
         ZStack {
-          // Outer glow
           Circle()
-            .fill(
-              RadialGradient(
-                colors: [Color.blue.opacity(0.3), Color.clear],
-                center: .center,
-                startRadius: 60,
-                endRadius: 90
-              )
-            )
+            .fill(RadialGradient(
+              colors: [Color.blue.opacity(0.3), .clear],
+              center: .center,
+              startRadius: 60,
+              endRadius: 90
+            ))
             .frame(width: 180, height: 180)
             .scaleEffect(glowScale)
-          
-          // Background with glassmorphism
+
           Circle()
             .fill(Color.white.opacity(0.1))
-            .background(
-              Circle()
-                .fill(.ultraThinMaterial)
-            )
+            .background(Circle().fill(.ultraThinMaterial))
             .frame(width: 120, height: 120)
             .shadow(color: .blue.opacity(0.5), radius: 20)
 
           Image(systemName: nextAngle.symbolName)
             .font(.system(size: 50, weight: .medium))
-            .foregroundStyle(
-              LinearGradient(
-                colors: [Color.blue, Color.cyan],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-              )
-            )
+            .foregroundStyle(LinearGradient(
+              colors: [.blue, .cyan],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            ))
             .scaleEffect(scale)
         }
 
-        // Angle title with gradient
         Text(nextAngle.title)
           .font(.system(size: 28, weight: .bold))
-          .foregroundStyle(
-            LinearGradient(
-              colors: [.white, .white.opacity(0.9)],
-              startPoint: .top,
-              endPoint: .bottom
-            )
-          )
+          .foregroundStyle(LinearGradient(
+            colors: [.white, .white.opacity(0.9)],
+            startPoint: .top,
+            endPoint: .bottom
+          ))
           .shadow(color: .black.opacity(0.3), radius: 4)
 
-        // Instructions with better styling
         Text(nextAngle.instructions)
           .font(.system(size: 15, weight: .medium))
           .foregroundColor(.white.opacity(0.85))
@@ -92,17 +73,14 @@ struct QuickAngleTransition: View {
           .padding(.horizontal, 40)
           .lineSpacing(5)
 
-        // Ready indicator with modern design
         HStack(spacing: 10) {
           Image(systemName: "arrow.right.circle.fill")
             .font(.system(size: 18))
-            .foregroundStyle(
-              LinearGradient(
-                colors: [Color.blue, Color.cyan],
-                startPoint: .leading,
-                endPoint: .trailing
-              )
-            )
+            .foregroundStyle(LinearGradient(
+              colors: [.blue, .cyan],
+              startPoint: .leading,
+              endPoint: .trailing
+            ))
           Text("Hazır olduğunuzda devam edin")
             .font(.system(size: 13, weight: .medium))
             .foregroundColor(.white.opacity(0.7))
@@ -112,10 +90,7 @@ struct QuickAngleTransition: View {
         .background(
           Capsule()
             .fill(Color.white.opacity(0.1))
-            .background(
-              Capsule()
-                .fill(.ultraThinMaterial)
-            )
+            .background(Capsule().fill(.ultraThinMaterial))
         )
         .padding(.top, 12)
       }

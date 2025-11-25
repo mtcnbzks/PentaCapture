@@ -9,7 +9,6 @@ import Combine
 import Photos
 import UIKit
 
-/// Errors that can occur during storage operations
 enum StorageError: LocalizedError {
   case unauthorized
   case saveFailed
@@ -18,14 +17,10 @@ enum StorageError: LocalizedError {
 
   var errorDescription: String? {
     switch self {
-    case .unauthorized:
-      return "Fotoğraf galerisine erişim izni verilmedi."
-    case .saveFailed:
-      return "Fotoğraf kaydedilemedi."
-    case .loadFailed:
-      return "Fotoğraf yüklenemedi."
-    case .invalidData:
-      return "Geçersiz fotoğraf verisi."
+    case .unauthorized: "Fotoğraf galerisine erişim izni verilmedi."
+    case .saveFailed: "Fotoğraf kaydedilemedi."
+    case .loadFailed: "Fotoğraf yüklenemedi."
+    case .invalidData: "Geçersiz fotoğraf verisi."
     }
   }
 }

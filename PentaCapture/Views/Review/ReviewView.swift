@@ -494,58 +494,36 @@ struct PhotoDetailView: View {
   }
 }
 
-/// Info row for detail view
 struct InfoRow: View {
   let label: String
   let value: String
 
   var body: some View {
     HStack {
-      Text(label)
-        .font(.subheadline)
-        .foregroundColor(.white.opacity(0.7))
-
+      Text(label).font(.subheadline).foregroundColor(.white.opacity(0.7))
       Spacer()
-
-      Text(value)
-        .font(.subheadline)
-        .fontWeight(.medium)
-        .foregroundColor(.white)
+      Text(value).font(.subheadline).fontWeight(.medium).foregroundColor(.white)
     }
   }
 }
 
-/// Basit UIActivityViewController wrapper
 struct ActivityViewControllerRepresentable: UIViewControllerRepresentable {
   let activityItems: [Any]
 
   func makeUIViewController(context: Context) -> UIActivityViewController {
-    let controller = UIActivityViewController(
-      activityItems: activityItems,
-      applicationActivities: nil
-    )
-    return controller
+    UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
   }
 
-  func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
-    // No updates needed
-  }
+  func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-/// Legacy wrapper for other share sheets
 struct ActivityViewController: UIViewControllerRepresentable {
   let activityViewController: UIActivityViewController
 
-  func makeUIViewController(context: Context) -> UIActivityViewController {
-    return activityViewController
-  }
-
-  func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
-    // No updates needed
-  }
+  func makeUIViewController(context: Context) -> UIActivityViewController { activityViewController }
+  func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-/// Identifiable wrapper for URL to use with sheet(item:)
 struct IdentifiableURL: Identifiable {
   let id = UUID()
   let url: URL

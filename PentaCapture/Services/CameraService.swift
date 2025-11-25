@@ -9,7 +9,6 @@ internal import AVFoundation
 import Combine
 import UIKit
 
-/// Errors that can occur during camera operations
 enum CameraError: LocalizedError {
   case unauthorized
   case configurationFailed
@@ -21,68 +20,55 @@ enum CameraError: LocalizedError {
 
   var errorDescription: String? {
     switch self {
-    case .unauthorized:
-      return "Kamera erişim izni gerekli"
-    case .configurationFailed:
-      return "Kamera yapılandırma hatası"
-    case .captureSessionNotRunning:
-      return "Kamera çalışmıyor"
-    case .captureFailed:
-      return "Fotoğraf çekimi başarısız"
-    case .noCameraAvailable:
-      return "Kamera bulunamadı"
-    case .insufficientLight:
-      return "Yetersiz ışık"
-    case .deviceTooUnstable:
-      return "Cihaz çok hareketli"
+    case .unauthorized: "Kamera erişim izni gerekli"
+    case .configurationFailed: "Kamera yapılandırma hatası"
+    case .captureSessionNotRunning: "Kamera çalışmıyor"
+    case .captureFailed: "Fotoğraf çekimi başarısız"
+    case .noCameraAvailable: "Kamera bulunamadı"
+    case .insufficientLight: "Yetersiz ışık"
+    case .deviceTooUnstable: "Cihaz çok hareketli"
     }
   }
 
   var recoverySuggestion: String? {
     switch self {
     case .unauthorized:
-      return
-        "PentaCapture'ın çalışması için kamera izni gereklidir. Lütfen Ayarlar > PentaCapture > Kamera bölümünden izin verin."
+      "PentaCapture'ın çalışması için kamera izni gereklidir. Lütfen Ayarlar > PentaCapture > Kamera bölümünden izin verin."
     case .configurationFailed:
-      return
-        "Kamera yapılandırılırken bir hata oluştu. Lütfen uygulamayı yeniden başlatın. Sorun devam ederse cihazınızı yeniden başlatın."
+      "Kamera yapılandırılırken bir hata oluştu. Lütfen uygulamayı yeniden başlatın. Sorun devam ederse cihazınızı yeniden başlatın."
     case .captureSessionNotRunning:
-      return "Kamera servisi başlatılamadı. Lütfen bir süre bekleyip tekrar deneyin."
+      "Kamera servisi başlatılamadı. Lütfen bir süre bekleyip tekrar deneyin."
     case .captureFailed:
-      return "Fotoğraf çekimi sırasında bir hata oluştu. Lütfen tekrar deneyin."
+      "Fotoğraf çekimi sırasında bir hata oluştu. Lütfen tekrar deneyin."
     case .noCameraAvailable:
-      return "Bu cihazda ön kamera bulunamadı. Lütfen farklı bir cihaz kullanın."
+      "Bu cihazda ön kamera bulunamadı. Lütfen farklı bir cihaz kullanın."
     case .insufficientLight:
-      return "Fotoğraf çekimi için yeterli ışık yok. Lütfen daha aydınlık bir ortamda çekim yapın."
+      "Fotoğraf çekimi için yeterli ışık yok. Lütfen daha aydınlık bir ortamda çekim yapın."
     case .deviceTooUnstable:
-      return "Cihazınızı daha sabit tutun. Hareketli çekimler kalitesiz fotoğraflara neden olur."
+      "Cihazınızı daha sabit tutun. Hareketli çekimler kalitesiz fotoğraflara neden olur."
     }
   }
 }
 
-/// Flash mode options
 enum FlashMode: String, CaseIterable {
   case off = "Kapalı"
   case auto = "Otomatik"
-  
+
   var icon: String {
     switch self {
-    case .off: return "bolt.slash.fill"
-    case .auto: return "bolt.badge.automatic.fill"
+    case .off: "bolt.slash.fill"
+    case .auto: "bolt.badge.automatic.fill"
     }
   }
-  
+
   var avFlashMode: AVCaptureDevice.FlashMode {
     switch self {
-    case .off: return .off
-    case .auto: return .auto
+    case .off: .off
+    case .auto: .auto
     }
   }
-  
-  /// Default flash mode for all capture angles
-  static func defaultMode(for angle: CaptureAngle) -> FlashMode {
-    return .off  // All angles: flash off by default
-  }
+
+  static func defaultMode(for angle: CaptureAngle) -> FlashMode { .off }
 }
 
 /// Service responsible for managing camera operations

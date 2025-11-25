@@ -195,14 +195,13 @@ struct OnboardingView: View {
   }
 }
 
-/// Single onboarding page
 struct OnboardingPage {
   let icon: String
   let title: String
   let description: String
   let color: Color
-  var needsCameraPermission: Bool = false
-  var needsPhotoLibraryPermission: Bool = false
+  var needsCameraPermission = false
+  var needsPhotoLibraryPermission = false
 }
 
 /// View for a single onboarding page
@@ -388,44 +387,28 @@ struct AngleCard: View {
   }
 }
 
-/// Tips section
 struct TipsSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("İpuçları")
-        .font(.title3)
-        .fontWeight(.bold)
-        .foregroundColor(.white)
-
+      Text("İpuçları").font(.title3).fontWeight(.bold).foregroundColor(.white)
       TipRow(icon: "lightbulb.fill", text: "Aydınlık bir ortamda çekim yapın")
       TipRow(icon: "hand.raised.fill", text: "Telefonu sabit tutun")
       TipRow(icon: "speaker.wave.3.fill", text: "Sesli geri bildirimleri açık tutun")
       TipRow(icon: "checkmark.circle.fill", text: "Ekrandaki kılavuzları takip edin")
     }
     .padding()
-    .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(Color.blue.opacity(0.2))
-    )
+    .background(RoundedRectangle(cornerRadius: 16).fill(Color.blue.opacity(0.2)))
   }
 }
 
-/// Single tip row
 struct TipRow: View {
   let icon: String
   let text: String
 
   var body: some View {
     HStack(spacing: 12) {
-      Image(systemName: icon)
-        .font(.system(size: 20))
-        .foregroundColor(.blue)
-        .frame(width: 30)
-
-      Text(text)
-        .font(.subheadline)
-        .foregroundColor(.white.opacity(0.9))
-
+      Image(systemName: icon).font(.system(size: 20)).foregroundColor(.blue).frame(width: 30)
+      Text(text).font(.subheadline).foregroundColor(.white.opacity(0.9))
       Spacer()
     }
   }

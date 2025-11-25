@@ -7,39 +7,58 @@
 
 import SwiftUI
 
-/// Real-time visual feedback for validation status
 struct ValidationFeedbackView: View {
   let validation: PoseValidation?
 
   var body: some View {
-    VStack(spacing: 0) {
-      if let validation = validation {
-        // Only show detailed metrics - minimal design
-        ValidationMetricsView(validation: validation)
-      }
+    if let validation {
+      ValidationMetricsView(validation: validation)
     }
   }
 }
 
-/// Status indicator with color and icon
 struct StatusIndicatorView: View {
   let status: ValidationStatus
 
+  private var statusColor: Color {
+    switch status {
+    case .invalid: .red
+    case .adjusting: .orange
+    case .valid: .yellow
+    case .locked: .green
+    }
+  }
+
+  private var statusIcon: String {
+    switch status {
+    case .invalid: "xmark.circle.fill"
+    case .adjusting: "arrow.triangle.2.circlepath"
+    case .valid: "checkmark.circle"
+    case .locked: "lock.circle.fill"
+    }
+  }
+
+  private var statusText: String {
+    switch status {
+    case .invalid: "Pozisyon Gerekli"
+    case .adjusting: "Ayarlanıyor..."
+    case .valid: "İyi - Sabit Tutun"
+    case .locked: "Kilitlendi!"
+    }
+  }
+
   var body: some View {
     HStack(spacing: 12) {
-      // Animated status icon
       ZStack {
         Circle()
           .fill(statusColor)
           .frame(width: 44, height: 44)
-
         Image(systemName: statusIcon)
           .font(.system(size: 22))
           .foregroundColor(.white)
       }
       .shadow(color: statusColor.opacity(0.6), radius: 8)
 
-      // Status text
       Text(statusText)
         .font(.title3)
         .fontWeight(.semibold)
@@ -47,207 +66,129 @@ struct StatusIndicatorView: View {
     }
     .animation(.easeInOut(duration: 0.3), value: status)
   }
-
-  private var statusColor: Color {
-    switch status {
-    case .invalid:
-      return .red
-    case .adjusting:
-      return .orange
-    case .valid:
-      return .yellow
-    case .locked:
-      return .green
-    }
-  }
-
-  private var statusIcon: String {
-    switch status {
-    case .invalid:
-      return "xmark.circle.fill"
-    case .adjusting:
-      return "arrow.triangle.2.circlepath"
-    case .valid:
-      return "checkmark.circle"
-    case .locked:
-      return "lock.circle.fill"
-    }
-  }
-
-  private var statusText: String {
-    switch status {
-    case .invalid:
-      return "Pozisyon Gerekli"
-    case .adjusting:
-      return "Ayarlanıyor..."
-    case .valid:
-      return "İyi - Sabit Tutun"
-    case .locked:
-      return "Kilitlendi!"
-    }
-  }
 }
 
-/// Minimal validation metrics
 struct ValidationMetricsView: View {
   let validation: PoseValidation
 
   var body: some View {
-    // Fixed size container to prevent layout shifts
     Group {
-      // Son 2 adımda (vertex, donorArea) yüz açısı göstermiyoruz - yüz yok zaten
-      // Sadece ilk 3 adımda (frontFace, rightProfile, leftProfile) göster
-      // Yaw metric (Face direction) - for frontFace, leftProfile, rightProfile
       if let currentYaw = validation.orientationValidation.currentYaw,
-        let targetYaw = validation.orientationValidation.targetYaw
-      {
+         let targetYaw = validation.orientationValidation.targetYaw {
         yawMetricContent(currentYaw: currentYaw, targetYaw: targetYaw)
       } else {
-        // Invisible placeholder to maintain layout
         Color.clear
       }
     }
     .frame(width: 180, height: 50)
   }
-  
+
   @ViewBuilder
   private func yawMetricContent(currentYaw: Double, targetYaw: Double) -> some View {
-      let yawError = abs(currentYaw - targetYaw)
-      let yawStatus =
-        yawError <= 25 ? ValidationStatus.valid : ValidationStatus.adjusting(progress: 0.5)
+    let yawError = abs(currentYaw - targetYaw)
+    let yawStatus: ValidationStatus = yawError <= 25 ? .valid : .adjusting(progress: 0.5)
 
-      HStack(spacing: 8) {
-        // Face tracking icon - compact
-        Image(systemName: "face.smiling")
-          .font(.system(size: 14, weight: .medium))
-          .foregroundColor(.white.opacity(0.5))
+    HStack(spacing: 8) {
+      Image(systemName: "face.smiling")
+        .font(.system(size: 14, weight: .medium))
+        .foregroundColor(.white.opacity(0.5))
 
-        // Direction arrow (if needed) - compact icon
-        if currentYaw < -5 {
-          Image(systemName: "arrow.left.circle.fill")
-            .font(.system(size: 18))
-            .foregroundColor(.white.opacity(0.8))
-        } else if currentYaw > 5 {
-          Image(systemName: "arrow.right.circle.fill")
-            .font(.system(size: 18))
-            .foregroundColor(.white.opacity(0.8))
-        }
-
-        // Compact current angle value with gradient
-        Text(String(format: "%.0f°", abs(currentYaw)))
-          .font(.system(size: 28, weight: .bold, design: .rounded))
-          .foregroundStyle(
-            LinearGradient(
-              colors: [.white, .white.opacity(0.9)],
-              startPoint: .top,
-              endPoint: .bottom
-            )
-          )
-          .monospacedDigit()
-          .shadow(color: .black.opacity(0.4), radius: 3)
-
-        // Minimal target reference
-        Text("→ \(String(format: "%.0f°", targetYaw))")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundColor(.white.opacity(0.5))
-          .monospacedDigit()
-
-        // Compact status indicator
-        Circle()
-          .fill(yawStatusColor(yawStatus))
-          .frame(width: 10, height: 10)
-          .shadow(color: yawStatusColor(yawStatus).opacity(0.8), radius: 4)
-          .overlay(
-            Circle()
-              .stroke(yawStatusColor(yawStatus).opacity(0.5), lineWidth: 2)
-              .frame(width: 16, height: 16)
-          )
+      if currentYaw < -5 {
+        Image(systemName: "arrow.left.circle.fill")
+          .font(.system(size: 18))
+          .foregroundColor(.white.opacity(0.8))
+      } else if currentYaw > 5 {
+        Image(systemName: "arrow.right.circle.fill")
+          .font(.system(size: 18))
+          .foregroundColor(.white.opacity(0.8))
       }
-      .padding(.horizontal, 14)
-      .padding(.vertical, 10)
-      .background(
-        Capsule()
-          .fill(Color.black.opacity(0.4))
-          .background(
-            Capsule()
-              .fill(.ultraThinMaterial)
-          )
-      )
-      .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
-  }
 
-  private func yawStatusColor(_ status: ValidationStatus) -> Color {
-    switch status {
-    case .invalid:
-      return .red
-    case .adjusting:
-      return .orange
-    case .valid, .locked:
-      return .green
+      Text(String(format: "%.0f°", abs(currentYaw)))
+        .font(.system(size: 28, weight: .bold, design: .rounded))
+        .foregroundStyle(LinearGradient(
+          colors: [.white, .white.opacity(0.9)],
+          startPoint: .top,
+          endPoint: .bottom
+        ))
+        .monospacedDigit()
+        .shadow(color: .black.opacity(0.4), radius: 3)
+
+      Text("→ \(String(format: "%.0f°", targetYaw))")
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundColor(.white.opacity(0.5))
+        .monospacedDigit()
+
+      Circle()
+        .fill(statusColor(yawStatus))
+        .frame(width: 10, height: 10)
+        .shadow(color: statusColor(yawStatus).opacity(0.8), radius: 4)
+        .overlay(
+          Circle()
+            .stroke(statusColor(yawStatus).opacity(0.5), lineWidth: 2)
+            .frame(width: 16, height: 16)
+        )
     }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .background(
+      Capsule()
+        .fill(Color.black.opacity(0.4))
+        .background(Capsule().fill(.ultraThinMaterial))
+    )
+    .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
   }
 
   private func statusColor(_ status: ValidationStatus) -> Color {
     switch status {
-    case .invalid:
-      return .red
-    case .adjusting:
-      return .orange
-    case .valid, .locked:
-      return .green
+    case .invalid: .red
+    case .adjusting: .orange
+    case .valid, .locked: .green
     }
   }
 }
 
-/// Single metric row
 struct MetricRow: View {
   let icon: String
   let label: String
   let status: ValidationStatus
   let detail: String
 
+  private var statusColor: Color {
+    switch status {
+    case .invalid: .red
+    case .adjusting: .orange
+    case .valid, .locked: .green
+    }
+  }
+
   var body: some View {
     HStack {
-      Image(systemName: icon)
-        .frame(width: 20)
-
-      Text(label)
-        .frame(maxWidth: .infinity, alignment: .leading)
-
-      Text(detail)
-        .fontWeight(.semibold)
-
-      Circle()
-        .fill(statusColor)
-        .frame(width: 8, height: 8)
+      Image(systemName: icon).frame(width: 20)
+      Text(label).frame(maxWidth: .infinity, alignment: .leading)
+      Text(detail).fontWeight(.semibold)
+      Circle().fill(statusColor).frame(width: 8, height: 8)
     }
     .foregroundColor(.white.opacity(0.9))
   }
-
-  private var statusColor: Color {
-    switch status {
-    case .invalid:
-      return .red
-    case .adjusting:
-      return .orange
-    case .valid, .locked:
-      return .green
-    }
-  }
 }
 
-/// Progress bar showing validation progress
 struct ValidationProgressBar: View {
   let progress: Double
+
+  private var progressColor: Color {
+    switch progress {
+    case ..<0.3: .red
+    case 0.3..<0.7: .orange
+    case 0.7..<0.95: .yellow
+    default: .green
+    }
+  }
 
   var body: some View {
     GeometryReader { geometry in
       ZStack(alignment: .leading) {
-        // Background
         RoundedRectangle(cornerRadius: 4)
           .fill(Color.white.opacity(0.2))
-
-        // Progress fill
         RoundedRectangle(cornerRadius: 4)
           .fill(progressColor)
           .frame(width: geometry.size.width * progress)
@@ -256,41 +197,31 @@ struct ValidationProgressBar: View {
     }
     .frame(height: 8)
   }
-
-  private var progressColor: Color {
-    if progress < 0.3 {
-      return .red
-    } else if progress < 0.7 {
-      return .orange
-    } else if progress < 0.95 {
-      return .yellow
-    } else {
-      return .green
-    }
-  }
 }
 
-/// Compact validation feedback for minimal UI
 struct CompactValidationFeedback: View {
   let validation: PoseValidation?
 
+  private func statusColor(_ status: ValidationStatus) -> Color {
+    switch status {
+    case .invalid: .red
+    case .adjusting: .orange
+    case .valid: .yellow
+    case .locked: .green
+    }
+  }
+
   var body: some View {
     HStack(spacing: 12) {
-      if let validation = validation {
-        // Status dot
+      if let validation {
         Circle()
           .fill(statusColor(validation.overallStatus))
           .frame(width: 12, height: 12)
-
-        // Message
         Text(validation.primaryFeedback)
           .font(.caption)
           .fontWeight(.medium)
           .foregroundColor(.white)
-
         Spacer()
-
-        // Progress percentage
         Text("\(Int(validation.progress * 100))%")
           .font(.caption)
           .fontWeight(.bold)
@@ -299,40 +230,21 @@ struct CompactValidationFeedback: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
-    .background(
-      Capsule()
-        .fill(Color.black.opacity(0.7))
-    )
-  }
-
-  private func statusColor(_ status: ValidationStatus) -> Color {
-    switch status {
-    case .invalid:
-      return .red
-    case .adjusting:
-      return .orange
-    case .valid:
-      return .yellow
-    case .locked:
-      return .green
-    }
+    .background(Capsule().fill(Color.black.opacity(0.7)))
   }
 }
 
-/// Animated validation indicator
 struct AnimatedValidationIndicator: View {
   let validation: PoseValidation?
   @State private var animationAmount: CGFloat = 1.0
 
   var body: some View {
     ZStack {
-      if let validation = validation, validation.overallStatus == .locked {
-        // Success animation
+      if let validation, validation.overallStatus == .locked {
         Circle()
           .stroke(Color.green, lineWidth: 3)
           .scaleEffect(animationAmount)
           .opacity(2 - animationAmount)
-
         Image(systemName: "checkmark")
           .font(.system(size: 40, weight: .bold))
           .foregroundColor(.green)

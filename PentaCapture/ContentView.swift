@@ -550,6 +550,17 @@ struct SettingsView: View {
   }
 }
 
+// MARK: - Date Formatter Extension
+private extension DateFormatter {
+  static let turkishShort: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .short
+    formatter.timeStyle = .short
+    formatter.locale = Locale(identifier: "tr_TR")
+    return formatter
+  }()
+}
+
 // MARK: - Feature Row
 struct FeatureRow: View {
   let icon: String
@@ -561,11 +572,9 @@ struct FeatureRow: View {
         .font(.system(size: 16, weight: .medium))
         .foregroundColor(.white.opacity(0.8))
         .frame(width: 24)
-
       Text(text)
         .font(.system(size: 15, weight: .regular))
         .foregroundColor(.white.opacity(0.7))
-
       Spacer()
     }
   }

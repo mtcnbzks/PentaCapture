@@ -11,31 +11,23 @@ import CoreImage
 import simd
 import UIKit
 
-/// ARKit'ten gelen yüz pozisyonu bilgisi
 struct HeadPose: Equatable {
-  let yaw: Double  // Yüz rotasyonu (sol/sağ) - radyan
-  let pitch: Double  // Yüz eğimi (yukarı/aşağı) - radyan
-  let roll: Double  // Yüz yatışı (yan eğim) - radyan
-  let transform: simd_float4x4  // Tam transform matrisi
-  let position: simd_float3  // 3D pozisyon (x, y, z) - kamera koordinatlarında
+  let yaw: Double
+  let pitch: Double
+  let roll: Double
+  let transform: simd_float4x4
+  let position: simd_float3
 
-  // Derece cinsinden değerler
   var yawDegrees: Double { yaw * 180.0 / .pi }
   var pitchDegrees: Double { pitch * 180.0 / .pi }
   var rollDegrees: Double { roll * 180.0 / .pi }
 
-  // Yüzün merkeze olan uzaklığı (normalized, 0.0 = merkez)
-  // x: yatay offset (-left, +right), y: dikey offset (-down, +up)
+  /// Normalized center offset (0.0 = center)
   var centerOffset: CGPoint {
-    // ARKit position: x = right, y = up, z = forward (camera space)
-    // Normalize edilmiş değerler (kabaca 0.3 metre = tam ekran)
-    let normalizedX = CGFloat(position.x / 0.15)  // ±0.15m ≈ tam ekran genişliği
-    let normalizedY = CGFloat(position.y / 0.2)  // ±0.2m ≈ tam ekran yüksekliği
-    return CGPoint(x: normalizedX, y: normalizedY)
+    CGPoint(x: CGFloat(position.x / 0.15), y: CGFloat(position.y / 0.2))
   }
 }
 
-/// Face tracking hataları
 enum FaceTrackingError: LocalizedError {
   case notSupported
   case sessionFailed
@@ -43,26 +35,20 @@ enum FaceTrackingError: LocalizedError {
 
   var errorDescription: String? {
     switch self {
-    case .notSupported:
-      return "Bu cihazda yüz takibi desteklenmiyor"
-    case .sessionFailed:
-      return "ARSession başlatılamadı"
-    case .noFaceDetected:
-      return "Yüz tespit edilemedi"
+    case .notSupported: "Bu cihazda yüz takibi desteklenmiyor"
+    case .sessionFailed: "ARSession başlatılamadı"
+    case .noFaceDetected: "Yüz tespit edilemedi"
     }
   }
 
   var recoverySuggestion: String? {
     switch self {
     case .notSupported:
-      return
-        "PentaCapture, iPhone X veya daha yeni bir cihaz gerektirir. Lütfen TrueDepth kamerası olan bir cihaz kullanın."
+      "PentaCapture, iPhone X veya daha yeni bir cihaz gerektirir. Lütfen TrueDepth kamerası olan bir cihaz kullanın."
     case .sessionFailed:
-      return
-        "Uygulamayı yeniden başlatmayı deneyin. Sorun devam ederse lütfen cihazınızı yeniden başlatın."
+      "Uygulamayı yeniden başlatmayı deneyin. Sorun devam ederse lütfen cihazınızı yeniden başlatın."
     case .noFaceDetected:
-      return
-        "Yüzünüzün kamera görüş alanında olduğundan ve ortamın yeterince aydınlık olduğundan emin olun."
+      "Yüzünüzün kamera görüş alanında olduğundan ve ortamın yeterince aydınlık olduğundan emin olun."
     }
   }
 }
