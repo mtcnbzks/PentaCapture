@@ -8,7 +8,6 @@
 import CoreGraphics
 import Foundation
 
-/// Validasyon durumu
 enum ValidationStatus: Equatable {
   case invalid
   case adjusting(progress: Double)
@@ -16,22 +15,22 @@ enum ValidationStatus: Equatable {
   case locked
 
   var isValid: Bool {
-    if case .valid = self { return true }
-    if case .locked = self { return true }
-    return false
+    switch self {
+    case .valid, .locked: true
+    default: false
+    }
   }
 
   var progress: Double {
     switch self {
-    case .invalid: return 0.0
-    case .adjusting(let progress): return progress
-    case .valid: return 0.95
-    case .locked: return 1.0
+    case .invalid: 0.0
+    case .adjusting(let p): p
+    case .valid: 0.95
+    case .locked: 1.0
     }
   }
 }
 
-/// Yönelim validasyonu
 struct OrientationValidation {
   let status: ValidationStatus
   let currentPitch: Double
@@ -40,20 +39,17 @@ struct OrientationValidation {
   let currentYaw: Double?
   let targetYaw: Double?
   let yawError: Double?
-  let currentRoll: Double?  // Donör bölgesi için
+  let currentRoll: Double?
   let targetRoll: Double?
   let rollError: Double?
 
   var feedbackMessage: String {
     switch status {
     case .invalid:
-      // Roll kontrolü (donör bölgesi için)
-      if let rollError = rollError, let targetRoll = targetRoll, rollError > 40 {
+      if let rollError, rollError > 40 {
         return "Telefonu ters tutun (baş aşağı)"
       }
-      
-      // Yaw kontrolü
-      if let yawError = yawError, let targetYaw = targetYaw, abs(yawError) > 10 {
+      if let yawError, let targetYaw, abs(yawError) > 10 {
         if yawError > 0 {
           return targetYaw > 0
             ? "Başınızı daha fazla sağa çevirin" : "Başınızı daha az sağa çevirin"
@@ -70,7 +66,6 @@ struct OrientationValidation {
   }
 }
 
-/// Tespit validasyonu
 struct DetectionValidation {
   let status: ValidationStatus
   let boundingBox: CGRect?
@@ -83,23 +78,18 @@ struct DetectionValidation {
 
     switch status {
     case .invalid:
-      // Yönlendirme mesajı (merkeze yaklaştır)
       if abs(centerOffset.x) > abs(centerOffset.y) {
         return centerOffset.x > 0 ? "Yüzünüzü daha sola alın" : "Yüzünüzü daha sağa alın"
       } else {
         return centerOffset.y > 0 ? "Yüzünüzü daha aşağı alın" : "Yüzünüzü daha yukarı alın"
       }
-    case .adjusting:
-      return "Yüzünüzü merkeze getirin..."
-    case .valid:
-      return "Pozisyon iyi"
-    case .locked:
-      return "Kilitlendi!"
+    case .adjusting: return "Yüzünüzü merkeze getirin..."
+    case .valid: return "Pozisyon iyi"
+    case .locked: return "Kilitlendi!"
     }
   }
 }
 
-/// Genel pose validasyonu
 struct PoseValidation {
   let orientationValidation: OrientationValidation
   let detectionValidation: DetectionValidation
@@ -110,27 +100,15 @@ struct PoseValidation {
 
   var overallStatus: ValidationStatus {
     guard orientationValidation.status.isValid && detectionValidation.status.isValid else {
-      let orientProgress = orientationValidation.status.progress
-      let detectionProgress = detectionValidation.status.progress
-      let combinedProgress = (orientProgress + detectionProgress) / 2.0
-
-      if combinedProgress < 0.1 { return .invalid }
-      return .adjusting(progress: combinedProgress)
+      let combinedProgress =
+        (orientationValidation.status.progress + detectionValidation.status.progress) / 2.0
+      return combinedProgress < 0.1 ? .invalid : .adjusting(progress: combinedProgress)
     }
-
-    if isStable && stabilityDuration >= Self.requiredStabilityDuration {
-      return .locked
-    }
-    return .valid
+    return isStable && stabilityDuration >= Self.requiredStabilityDuration ? .locked : .valid
   }
 
-  var isReadyForCapture: Bool {
-    overallStatus == .locked
-  }
-
-  var progress: Double {
-    overallStatus.progress
-  }
+  var isReadyForCapture: Bool { overallStatus == .locked }
+  var progress: Double { overallStatus.progress }
 
   var primaryFeedback: String {
     switch overallStatus {
@@ -148,16 +126,14 @@ struct PoseValidation {
   }
 }
 
-/// Validasyon metrikleri hesaplayıcı
-struct ValidationMetrics {
+enum ValidationMetrics {
   static func determineOrientationStatus(
     currentAngle: Double,
     targetAngle: Double,
     tolerance: Double
   ) -> ValidationStatus {
     let error = abs(currentAngle - targetAngle)
-    if error <= tolerance { return .valid }
-
+    guard error > tolerance else { return .valid }
     let progress = max(0, 1.0 - (error / (tolerance * 3)))
     return progress < 0.2 ? .invalid : .adjusting(progress: progress)
   }
@@ -178,7 +154,7 @@ struct ValidationMetrics {
     var yawValid = !requiresYaw
     var yawProgress = requiresYaw ? 0.0 : 1.0
 
-    if let currentYaw = currentYaw, let targetYaw = targetYaw {
+    if let currentYaw, let targetYaw {
       let yawError = abs(currentYaw - targetYaw)
       yawValid = yawError <= yawTolerance
       yawProgress = max(0, 1.0 - (yawError / (yawTolerance * 3)))
@@ -187,8 +163,7 @@ struct ValidationMetrics {
       yawProgress = 0.0
     }
 
-    if pitchValid && yawValid { return .valid }
-
+    guard !pitchValid || !yawValid else { return .valid }
     let overallProgress = (pitchProgress + yawProgress) / 2.0
     return overallProgress < 0.2 ? .invalid : .adjusting(progress: overallProgress)
   }

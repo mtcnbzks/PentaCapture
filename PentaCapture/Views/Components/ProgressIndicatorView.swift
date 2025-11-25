@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-/// Progress indicator showing which angle is being captured
 struct ProgressIndicatorView: View {
   let currentAngle: CaptureAngle
   let capturedAngles: Set<CaptureAngle>
@@ -21,9 +20,7 @@ struct ProgressIndicatorView: View {
           isCurrent: angle == currentAngle,
           isCaptured: capturedAngles.contains(angle)
         )
-        .onTapGesture {
-          onAngleTap?(angle)
-        }
+        .onTapGesture { onAngleTap?(angle) }
       }
     }
     .padding(.horizontal, 16)
@@ -31,28 +28,31 @@ struct ProgressIndicatorView: View {
     .background(
       Capsule()
         .fill(Color.black.opacity(0.4))
-        .background(
-          Capsule()
-            .fill(.ultraThinMaterial)
-        )
+        .background(Capsule().fill(.ultraThinMaterial))
     )
   }
 }
 
-/// Individual angle indicator
 struct AngleIndicator: View {
   let angle: CaptureAngle
   let isCurrent: Bool
   let isCaptured: Bool
 
+  private var backgroundColor: Color {
+    if isCaptured { .green } else if isCurrent { .blue } else { .gray.opacity(0.3) }
+  }
+
+  private var shadowColor: Color {
+    if isCaptured { .green.opacity(0.6) } else if isCurrent { .blue.opacity(0.6) } else { .clear }
+  }
+
   var body: some View {
     ZStack {
-      // Background with glow effect for current
       if isCurrent {
         Circle()
           .fill(
             RadialGradient(
-              colors: [Color.blue.opacity(0.4), Color.clear],
+              colors: [Color.blue.opacity(0.4), .clear],
               center: .center,
               startRadius: 16,
               endRadius: 24
@@ -60,7 +60,7 @@ struct AngleIndicator: View {
           )
           .frame(width: 48, height: 48)
       }
-      
+
       Circle()
         .fill(backgroundColor)
         .frame(width: 32, height: 32)
@@ -73,40 +73,16 @@ struct AngleIndicator: View {
       } else {
         Text("\(angle.rawValue + 1)")
           .font(.system(size: 13, weight: .bold))
-          .foregroundColor(textColor)
+          .foregroundColor(isCurrent ? .white : .white.opacity(0.6))
       }
     }
     .overlay(
       Circle()
-        .stroke(isCurrent ? Color.white : Color.clear, lineWidth: 2.5)
+        .stroke(isCurrent ? Color.white : .clear, lineWidth: 2.5)
         .frame(width: 36, height: 36)
     )
     .scaleEffect(isCurrent ? 1.1 : 1.0)
     .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isCurrent)
     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCaptured)
-  }
-
-  private var backgroundColor: Color {
-    if isCaptured {
-      return .green
-    } else if isCurrent {
-      return .blue
-    } else {
-      return .gray.opacity(0.3)
-    }
-  }
-
-  private var textColor: Color {
-    isCurrent ? .white : .white.opacity(0.6)
-  }
-  
-  private var shadowColor: Color {
-    if isCaptured {
-      return .green.opacity(0.6)
-    } else if isCurrent {
-      return .blue.opacity(0.6)
-    } else {
-      return .clear
-    }
   }
 }

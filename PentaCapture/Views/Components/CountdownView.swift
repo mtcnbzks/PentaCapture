@@ -7,19 +7,25 @@
 
 import SwiftUI
 
-/// Countdown with preparation message
 struct CountdownWithMessageView: View {
   let countdown: Int
   @State private var scale: CGFloat = 1.0
 
+  private var countdownColor: Color {
+    switch countdown {
+    case 3: .yellow
+    case 2: .orange
+    case 1: .green
+    default: .white
+    }
+  }
+
   var body: some View {
-    // Modern countdown with glassmorphism and glow
     ZStack {
-      // Outer glow ring
       Circle()
         .fill(
           RadialGradient(
-            colors: [countdownColor.opacity(0.4), Color.clear],
+            colors: [countdownColor.opacity(0.4), .clear],
             center: .center,
             startRadius: 60,
             endRadius: 100
@@ -27,23 +33,14 @@ struct CountdownWithMessageView: View {
         )
         .frame(width: 200, height: 200)
         .scaleEffect(scale * 1.2)
-      
-      // Main circle with glassmorphism
+
       Circle()
         .fill(Color.black.opacity(0.3))
-        .background(
-          Circle()
-            .fill(.ultraThinMaterial)
-        )
+        .background(Circle().fill(.ultraThinMaterial))
         .frame(width: 120, height: 120)
-        .overlay(
-          Circle()
-            .stroke(countdownColor, lineWidth: 4)
-            .frame(width: 120, height: 120)
-        )
+        .overlay(Circle().stroke(countdownColor, lineWidth: 4))
         .shadow(color: countdownColor.opacity(0.6), radius: 20)
-      
-      // Number with gradient
+
       Text("\(countdown)")
         .font(.system(size: 70, weight: .bold, design: .rounded))
         .foregroundStyle(
@@ -57,25 +54,8 @@ struct CountdownWithMessageView: View {
         .scaleEffect(scale)
     }
     .onChange(of: countdown) { _ in
-      withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
-        scale = 1.3
-      }
-      withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.08)) {
-        scale = 1.0
-      }
-    }
-  }
-
-  private var countdownColor: Color {
-    switch countdown {
-    case 3:
-      return .yellow
-    case 2:
-      return .orange
-    case 1:
-      return .green
-    default:
-      return .white
+      withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) { scale = 1.3 }
+      withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.08)) { scale = 1.0 }
     }
   }
 }

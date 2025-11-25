@@ -7,14 +7,11 @@
 
 import SwiftUI
 
-/// Type-erased Shape wrapper
 struct AnyShape: Shape {
   private let _path: (CGRect) -> Path
 
   init<S: Shape>(_ shape: S) {
-    _path = { rect in
-      shape.path(in: rect)
-    }
+    _path = shape.path(in:)
   }
 
   func path(in rect: CGRect) -> Path {

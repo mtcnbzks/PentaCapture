@@ -185,7 +185,6 @@ struct ReviewStatsHeader: View {
   }
 }
 
-/// Section header for photo groups
 struct SectionHeader: View {
   let icon: String
   let title: String
@@ -194,26 +193,16 @@ struct SectionHeader: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      Image(systemName: icon)
-        .font(.title3)
-        .foregroundColor(.blue)
-
-      Text(title)
-        .font(.headline)
-        .foregroundColor(.white)
-
+      Image(systemName: icon).font(.title3).foregroundColor(.blue)
+      Text(title).font(.headline).foregroundColor(.white)
       Spacer()
-
       Text("\(count)/\(total)")
         .font(.subheadline)
         .fontWeight(.semibold)
         .foregroundColor(count == total ? .green : .orange)
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
-        .background(
-          Capsule()
-            .fill(Color.white.opacity(0.1))
-        )
+        .background(Capsule().fill(Color.white.opacity(0.1)))
     }
   }
 }
@@ -320,7 +309,6 @@ struct TimelinePhotoCard: View {
   }
 }
 
-/// Empty card for uncaptured photo
 struct EmptyTimelineCard: View {
   let angle: CaptureAngle
   let onTap: () -> Void
@@ -331,13 +319,11 @@ struct EmptyTimelineCard: View {
         Image(systemName: angle.symbolName)
           .font(.system(size: 40))
           .foregroundColor(.white.opacity(0.4))
-
         Text(angle.title)
           .font(.subheadline)
           .fontWeight(.medium)
           .foregroundColor(.white.opacity(0.7))
           .multilineTextAlignment(.center)
-
         Text("Çekmek için dokunun")
           .font(.caption2)
           .foregroundColor(.blue.opacity(0.8))

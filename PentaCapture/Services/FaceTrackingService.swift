@@ -8,34 +8,26 @@
 import ARKit
 import Combine
 import CoreImage
-import simd
 import UIKit
+import simd
 
-/// ARKit'ten gelen yüz pozisyonu bilgisi
 struct HeadPose: Equatable {
-  let yaw: Double  // Yüz rotasyonu (sol/sağ) - radyan
-  let pitch: Double  // Yüz eğimi (yukarı/aşağı) - radyan
-  let roll: Double  // Yüz yatışı (yan eğim) - radyan
-  let transform: simd_float4x4  // Tam transform matrisi
-  let position: simd_float3  // 3D pozisyon (x, y, z) - kamera koordinatlarında
+  let yaw: Double
+  let pitch: Double
+  let roll: Double
+  let transform: simd_float4x4
+  let position: simd_float3
 
-  // Derece cinsinden değerler
   var yawDegrees: Double { yaw * 180.0 / .pi }
   var pitchDegrees: Double { pitch * 180.0 / .pi }
   var rollDegrees: Double { roll * 180.0 / .pi }
 
-  // Yüzün merkeze olan uzaklığı (normalized, 0.0 = merkez)
-  // x: yatay offset (-left, +right), y: dikey offset (-down, +up)
+  /// Normalized center offset (0.0 = center)
   var centerOffset: CGPoint {
-    // ARKit position: x = right, y = up, z = forward (camera space)
-    // Normalize edilmiş değerler (kabaca 0.3 metre = tam ekran)
-    let normalizedX = CGFloat(position.x / 0.15)  // ±0.15m ≈ tam ekran genişliği
-    let normalizedY = CGFloat(position.y / 0.2)  // ±0.2m ≈ tam ekran yüksekliği
-    return CGPoint(x: normalizedX, y: normalizedY)
+    CGPoint(x: CGFloat(position.x / 0.15), y: CGFloat(position.y / 0.2))
   }
 }
 
-/// Face tracking hataları
 enum FaceTrackingError: LocalizedError {
   case notSupported
   case sessionFailed
@@ -43,26 +35,20 @@ enum FaceTrackingError: LocalizedError {
 
   var errorDescription: String? {
     switch self {
-    case .notSupported:
-      return "Bu cihazda yüz takibi desteklenmiyor"
-    case .sessionFailed:
-      return "ARSession başlatılamadı"
-    case .noFaceDetected:
-      return "Yüz tespit edilemedi"
+    case .notSupported: "Bu cihazda yüz takibi desteklenmiyor"
+    case .sessionFailed: "ARSession başlatılamadı"
+    case .noFaceDetected: "Yüz tespit edilemedi"
     }
   }
 
   var recoverySuggestion: String? {
     switch self {
     case .notSupported:
-      return
-        "PentaCapture, iPhone X veya daha yeni bir cihaz gerektirir. Lütfen TrueDepth kamerası olan bir cihaz kullanın."
+      "PentaCapture, iPhone X veya daha yeni bir cihaz gerektirir. Lütfen TrueDepth kamerası olan bir cihaz kullanın."
     case .sessionFailed:
-      return
-        "Uygulamayı yeniden başlatmayı deneyin. Sorun devam ederse lütfen cihazınızı yeniden başlatın."
+      "Uygulamayı yeniden başlatmayı deneyin. Sorun devam ederse lütfen cihazınızı yeniden başlatın."
     case .noFaceDetected:
-      return
-        "Yüzünüzün kamera görüş alanında olduğundan ve ortamın yeterince aydınlık olduğundan emin olun."
+      "Yüzünüzün kamera görüş alanında olduğundan ve ortamın yeterince aydınlık olduğundan emin olun."
     }
   }
 }
@@ -78,7 +64,7 @@ class FaceTrackingService: NSObject, ObservableObject {
   nonisolated(unsafe) let isSupported: Bool
   let arSession = ARSession()  // Public - ARSCNView için gerekli
   private var frameCount = 0
-  
+
   // Idle timer management - auto-enable after 2 minutes
   private var idleTimerTask: Task<Void, Never>?
 
@@ -127,11 +113,11 @@ class FaceTrackingService: NSObject, ObservableObject {
     error = nil
     frameCount = 0
     trackingState = "Starting..."
-    
+
     // Disable idle timer to keep screen on during ARKit tracking
     UIApplication.shared.isIdleTimerDisabled = true
     print("🔆 Screen idle timer disabled - screen will stay on")
-    
+
     // Auto-enable idle timer after 2 minutes
     scheduleIdleTimerReenable()
 
@@ -144,12 +130,12 @@ class FaceTrackingService: NSObject, ObservableObject {
       UIApplication.shared.isIdleTimerDisabled = false
       return
     }
-    
+
     print("⏹️ Stopping ARKit Face Tracking...")
     arSession.pause()
     isTracking = false
     currentHeadPose = nil
-    
+
     // Cancel any pending idle timer re-enable
     cancelIdleTimerReenable()
     // Re-enable idle timer to allow screen to sleep
@@ -161,31 +147,31 @@ class FaceTrackingService: NSObject, ObservableObject {
   private func scheduleIdleTimerReenable() {
     // Cancel any existing task
     cancelIdleTimerReenable()
-    
+
     print("⏱️ Scheduling idle timer re-enable in 2 minutes")
     idleTimerTask = Task { @MainActor in
       // Wait 2 minutes (120 seconds)
       try? await Task.sleep(nanoseconds: 120_000_000_000)
-      
+
       // Check if task was cancelled
       guard !Task.isCancelled else {
         print("⏱️ Idle timer re-enable cancelled")
         return
       }
-      
+
       // Re-enable idle timer after 2 minutes
       UIApplication.shared.isIdleTimerDisabled = false
       print("🌙 Auto re-enabled idle timer after 2 minutes - screen can now sleep")
     }
   }
-  
+
   private func cancelIdleTimerReenable() {
     idleTimerTask?.cancel()
     idleTimerTask = nil
   }
-  
+
   // MARK: - High Resolution Capture (iOS 16+)
-  
+
   /// Capture high-resolution photo directly from ARKit session
   /// This is the BEST approach: 0 latency, 0 race conditions, highest quality
   /// Per Apple WWDC 2022: Use captureHighResolutionFrame for still image capture
@@ -194,30 +180,30 @@ class FaceTrackingService: NSObject, ObservableObject {
     guard isSupported else {
       throw FaceTrackingError.notSupported
     }
-    
+
     guard isTracking else {
       throw FaceTrackingError.sessionFailed
     }
-    
+
     print("📸 [ARKit Capture] Requesting high-resolution frame...")
     let captureStartTime = Date()
-    
+
     return try await withCheckedThrowingContinuation { continuation in
       arSession.captureHighResolutionFrame { [weak self] frame, error in
         let captureLatency = Date().timeIntervalSince(captureStartTime)
         print("📸 [ARKit Capture] Latency: \(String(format: "%.3f", captureLatency))s")
-        
+
         if let error = error {
           let nsError = error as NSError
-          
+
           // Handle specific ARKit capture errors
           if nsError.domain == "com.apple.arkit.error" {
             switch nsError.code {
-            case 101: // highResolutionFrameCaptureInProgress
+            case 101:  // highResolutionFrameCaptureInProgress
               print("❌ [ARKit Capture] Previous capture still in progress")
               continuation.resume(throwing: FaceTrackingError.sessionFailed)
               return
-            case 102: // highResolutionFrameCaptureFailed
+            case 102:  // highResolutionFrameCaptureFailed
               print("❌ [ARKit Capture] Capture failed in pipeline")
               continuation.resume(throwing: FaceTrackingError.sessionFailed)
               return
@@ -227,26 +213,26 @@ class FaceTrackingService: NSObject, ObservableObject {
               return
             }
           }
-          
+
           print("❌ [ARKit Capture] Error: \(error.localizedDescription)")
           continuation.resume(throwing: error)
           return
         }
-        
+
         guard let frame = frame else {
           print("❌ [ARKit Capture] No frame returned")
           continuation.resume(throwing: FaceTrackingError.noFaceDetected)
           return
         }
-        
+
         // Extract high-resolution captured image
         let pixelBuffer = frame.capturedImage
-        
+
         // Get buffer dimensions
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         print("📸 [ARKit Capture] Captured frame: \(width)x\(height)")
-        
+
         // Convert CVPixelBuffer to UIImage
         let processingStartTime = Date()
         guard let image = self?.convertPixelBufferToUIImage(pixelBuffer) else {
@@ -254,29 +240,29 @@ class FaceTrackingService: NSObject, ObservableObject {
           continuation.resume(throwing: FaceTrackingError.sessionFailed)
           return
         }
-        
+
         let processingTime = Date().timeIntervalSince(processingStartTime)
         print("📸 [ARKit Capture] Image conversion: \(String(format: "%.3f", processingTime))s")
         print("📸 [ARKit Capture] Final image size: \(image.size)")
-        
+
         // Mirror horizontally to match preview (front camera)
         let mirroredImage = self?.mirrorImageHorizontally(image) ?? image
         print("✅ [ARKit Capture] High-res capture complete!")
-        
+
         continuation.resume(returning: mirroredImage)
       }
     }
   }
-  
+
   /// Check if high-resolution capture is available
   /// Per Apple docs: Requires iOS 16+ and active ARSession
   @available(iOS 16.0, *)
   var canCaptureHighResolution: Bool {
     return isSupported && isTracking
   }
-  
+
   // MARK: - Image Conversion Helpers
-  
+
   /// Convert CVPixelBuffer to UIImage with proper orientation
   /// Per Apple ARKit docs: "capturedImage pixel buffer is NOT adjusted for device orientation"
   /// ARKit always captures in landscape-right orientation, we need to rotate for portrait
@@ -284,24 +270,24 @@ class FaceTrackingService: NSObject, ObservableObject {
     // Lock the pixel buffer for reading
     CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
     defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
-    
+
     // Get buffer properties
     let width = CVPixelBufferGetWidth(pixelBuffer)
     let height = CVPixelBufferGetHeight(pixelBuffer)
     print("📐 [ARKit Image] CVPixelBuffer (raw camera): \(width)x\(height) (landscape)")
-    
+
     // Create CIImage from pixel buffer
     let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-    
+
     // Create CIContext for rendering (use Metal for better performance)
     let context = CIContext(options: [.useSoftwareRenderer: false])
-    
+
     // Render to CGImage
     guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
       print("❌ Failed to create CGImage from CIImage")
       return nil
     }
-    
+
     // CRITICAL: ARKit camera orientation handling
     // Per Apple Documentation: "capturedImage is NOT adjusted for device orientation"
     // ARKit captures in landscape orientation from front camera
@@ -318,14 +304,14 @@ class FaceTrackingService: NSObject, ObservableObject {
     // - Front camera captures landscape-left naturally
     // - Need 90° CW rotation for portrait (.left)
     // - Need horizontal flip for mirror effect (Mirrored)
-    
+
     print("📐 [ARKit Image] Applying .leftMirrored (portrait + mirror for front camera)")
     let image = UIImage(cgImage: cgImage, scale: 1.0, orientation: .leftMirrored)
     print("📐 [ARKit Image] Final UIImage: \(image.size), orientation: .leftMirrored")
-    
+
     return image
   }
-  
+
   /// Mirror image horizontally - NO LONGER NEEDED
   /// Orientation .rightMirrored already handles mirroring
   private func mirrorImageHorizontally(_ image: UIImage) -> UIImage {

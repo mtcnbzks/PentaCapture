@@ -151,7 +151,9 @@ struct OnboardingView: View {
               RoundedRectangle(cornerRadius: 14)
                 .fill(
                   LinearGradient(
-                    colors: isNextButtonEnabled ? [Color.blue, Color.blue.opacity(0.8)] : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)],
+                    colors: isNextButtonEnabled
+                      ? [Color.blue, Color.blue.opacity(0.8)]
+                      : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                   )
@@ -178,31 +180,30 @@ struct OnboardingView: View {
     let photoStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
     photoLibraryPermissionGranted = (photoStatus == .authorized || photoStatus == .limited)
   }
-  
+
   // Check if next/start button should be enabled
   private var isNextButtonEnabled: Bool {
     let currentPageData = pages[currentPage]
-    
+
     // If current page needs camera permission, require it
     if currentPageData.needsCameraPermission && !cameraPermissionGranted {
       return false
     }
-    
+
     // Photo library permission is optional - don't block user
     // They can grant it later when saving to gallery
-    
+
     return true
   }
 }
 
-/// Single onboarding page
 struct OnboardingPage {
   let icon: String
   let title: String
   let description: String
   let color: Color
-  var needsCameraPermission: Bool = false
-  var needsPhotoLibraryPermission: Bool = false
+  var needsCameraPermission = false
+  var needsPhotoLibraryPermission = false
 }
 
 /// View for a single onboarding page
@@ -272,7 +273,7 @@ struct OnboardingPageView: View {
           )
         }
       }
-      .frame(height: 100) // Fixed height for permission area
+      .frame(height: 100)  // Fixed height for permission area
       .padding(.horizontal, 32)
       .padding(.top, 24)
 
@@ -388,44 +389,28 @@ struct AngleCard: View {
   }
 }
 
-/// Tips section
 struct TipsSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("İpuçları")
-        .font(.title3)
-        .fontWeight(.bold)
-        .foregroundColor(.white)
-
+      Text("İpuçları").font(.title3).fontWeight(.bold).foregroundColor(.white)
       TipRow(icon: "lightbulb.fill", text: "Aydınlık bir ortamda çekim yapın")
       TipRow(icon: "hand.raised.fill", text: "Telefonu sabit tutun")
       TipRow(icon: "speaker.wave.3.fill", text: "Sesli geri bildirimleri açık tutun")
       TipRow(icon: "checkmark.circle.fill", text: "Ekrandaki kılavuzları takip edin")
     }
     .padding()
-    .background(
-      RoundedRectangle(cornerRadius: 16)
-        .fill(Color.blue.opacity(0.2))
-    )
+    .background(RoundedRectangle(cornerRadius: 16).fill(Color.blue.opacity(0.2)))
   }
 }
 
-/// Single tip row
 struct TipRow: View {
   let icon: String
   let text: String
 
   var body: some View {
     HStack(spacing: 12) {
-      Image(systemName: icon)
-        .font(.system(size: 20))
-        .foregroundColor(.blue)
-        .frame(width: 30)
-
-      Text(text)
-        .font(.subheadline)
-        .foregroundColor(.white.opacity(0.9))
-
+      Image(systemName: icon).font(.system(size: 20)).foregroundColor(.blue).frame(width: 30)
+      Text(text).font(.subheadline).foregroundColor(.white.opacity(0.9))
       Spacer()
     }
   }

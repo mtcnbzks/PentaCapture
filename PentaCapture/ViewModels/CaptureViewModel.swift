@@ -5,11 +5,11 @@
 //  Created by Mehmetcan Bozkuş on 9.11.2025.
 //
 
+internal import AVFoundation
 import Combine
 import Foundation
 import SwiftUI
 import UIKit
-internal import AVFoundation
 
 /// Main coordinator for the capture process
 @MainActor
@@ -58,7 +58,7 @@ class CaptureViewModel: ObservableObject {
     self.sessionPersistenceService = sessionPersistenceService
     self.faceTrackingService = faceTrackingService
     self.motionService = motionService
-    
+
     // Restore saved session if requested
     if restoreSession, let savedSession = sessionPersistenceService.loadSession() {
       self.session = savedSession
@@ -84,18 +84,18 @@ class CaptureViewModel: ObservableObject {
         }
       }
       .store(in: &cancellables)
-    
+
     // Auto-save session when state changes (photos or angle)
     // Combine both publishers to ensure we capture complete state
     Publishers.CombineLatest(
       session.$capturedPhotos,
       session.$currentAngle
     )
-    .dropFirst() // Skip initial values
+    .dropFirst()  // Skip initial values
     .debounce(for: .seconds(0.5), scheduler: DispatchQueue.main)
     .sink { [weak self] photos, currentAngle in
       guard let self = self else { return }
-      
+
       // Only save if we have photos (don't save empty sessions)
       if !photos.isEmpty {
         // Save session with current state (photos + current angle)
@@ -112,14 +112,14 @@ class CaptureViewModel: ObservableObject {
       .sink { [weak self] _ in
         guard let self = self else { return }
         print("📱 App will resign active - pausing capture")
-        
+
         // Save session before going to background (even if complete)
         if self.session.capturedCount > 0 {
           print("💾 Saving session before background...")
           // Use synchronous save for critical moment
           self.sessionPersistenceService.saveSession(self.session)
         }
-        
+
         self.pauseCapture()
       }
       .store(in: &cancellables)
@@ -135,12 +135,12 @@ class CaptureViewModel: ObservableObject {
   // MARK: - Lifecycle
   func startCapture() {
     print("🎬 Starting capture session...")
-    
+
     // CRITICAL: Recheck camera authorization before starting
     // This ensures we have the latest authorization status
     Task {
       await cameraService.recheckAuthorization()
-      
+
       await MainActor.run {
         setupBindings()
 
@@ -149,7 +149,9 @@ class CaptureViewModel: ObservableObject {
 
         // Set default flash mode for current angle
         cameraService.flashMode = FlashMode.defaultMode(for: session.currentAngle)
-        print("💡 Initial flash mode: \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)")
+        print(
+          "💡 Initial flash mode: \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)"
+        )
 
         // Start tracking time for first angle
         session.startAngleCapture(for: session.currentAngle)
@@ -169,13 +171,13 @@ class CaptureViewModel: ObservableObject {
         // ARKit provides its own camera feed, no need for separate AVCaptureSession
         if faceTrackingService.isSupported {
           print("🚀 Starting ARKit-based capture (ARKit provides camera feed)")
-          
+
           // Small delay to ensure camera permission is fully granted
           DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self else { return }
-            
+
             self.faceTrackingService.startTracking()
-            
+
             // Setup camera for photo capture but DON'T start session yet
             // We'll start it only when capturing to avoid conflict with ARKit
             if self.cameraService.isAuthorized {
@@ -184,14 +186,16 @@ class CaptureViewModel: ObservableObject {
               // DON'T start the session here - ARKit is using the camera
             } else {
               print("⚠️ Camera not authorized yet, cannot setup camera")
-              self.errorMessage = "Kamera izni gerekli. Lütfen Ayarlar'dan kamera erişimine izin verin."
+              self.errorMessage =
+                "Kamera izni gerekli. Lütfen Ayarlar'dan kamera erişimine izin verin."
             }
-            
+
             print("✅ ARKit Face Tracking enabled (TrueDepth device)")
           }
         } else {
           print(
-            "❌ ARKit Face Tracking not available - app requires TrueDepth camera (iPhone X or later)")
+            "❌ ARKit Face Tracking not available - app requires TrueDepth camera (iPhone X or later)"
+          )
           // Fallback: Use regular camera without ARKit
           if !cameraService.isSessionRunning {
             if cameraService.isAuthorized {
@@ -243,27 +247,27 @@ class CaptureViewModel: ObservableObject {
   /// Use this during angle transitions to keep camera ready
   func pauseValidation() {
     print("⏸️ Pausing validation (camera stays warm)")
-    
+
     // Cancel countdown if active
     if isCountingDown {
       cancelCountdown()
     }
-    
+
     // Set transition flag to stop validation loop
     isShowingTransition = true
-    
+
     // Pause audio feedback during transition
     audioService.stopProximityFeedback()
   }
-  
+
   /// Resume validation after transition
   /// Camera is already running, just resume validation
   func resumeValidation() {
     print("▶️ Resuming validation (camera already warm)")
-    
+
     // Clear transition flag to resume validation loop
     isShowingTransition = false
-    
+
     // Resume audio feedback
     audioService.startProximityFeedback()
   }
@@ -333,8 +337,9 @@ class CaptureViewModel: ObservableObject {
     }
 
     // İlk 3 açıda yüz ekranda olmalı, son 2 açıda yüz ekrandan çıkabilir
-    let requiresFaceDetection = currentAngle == .frontFace || currentAngle == .rightProfile || currentAngle == .leftProfile
-    
+    let requiresFaceDetection =
+      currentAngle == .frontFace || currentAngle == .rightProfile || currentAngle == .leftProfile
+
     // ARKit'ten yüz pozisyonu al
     guard let headPose = faceTrackingService.currentHeadPose else {
       // Yüz tespit edilemedi
@@ -348,13 +353,13 @@ class CaptureViewModel: ObservableObject {
         if validationLogCount % 30 == 1 {
           print("   ℹ️  No face detected but OK for \(currentAngle.title) - face can be off-screen")
         }
-        
+
         // Device orientation (IMU) kullanarak validation
         let deviceOrientation = motionService.currentOrientation
         let devicePitch = deviceOrientation?.pitchDegrees ?? 0.0
         let deviceRoll = deviceOrientation?.rollDegrees ?? 0.0
         let pitchError = abs(devicePitch - currentAngle.targetPitch)
-        
+
         // Donör bölgesi için ROLL kontrolü de ekle (telefonun ters tutulduğunu doğrula)
         var rollValid = true
         var rollError: Double = 0.0
@@ -366,12 +371,14 @@ class CaptureViewModel: ObservableObject {
           let rollDiff3 = abs(deviceRoll - (targetRoll + 360.0))
           rollError = min(rollDiff1, rollDiff2, rollDiff3)
           rollValid = rollError <= currentAngle.rollTolerance
-          
+
           if validationLogCount % 30 == 1 {
-            print("   📱 Device roll: \(String(format: "%.1f", deviceRoll))° (target: ±180°, error: \(String(format: "%.1f", rollError))°)")
+            print(
+              "   📱 Device roll: \(String(format: "%.1f", deviceRoll))° (target: ±180°, error: \(String(format: "%.1f", rollError))°)"
+            )
           }
         }
-        
+
         // Device pitch VE roll'e göre validation durumu
         let orientationStatus: ValidationStatus
         if pitchError <= currentAngle.pitchTolerance && rollValid {
@@ -379,18 +386,24 @@ class CaptureViewModel: ObservableObject {
         } else {
           // Her iki faktörü de hesaba kat
           let pitchProgress = max(0, 1.0 - (pitchError / (currentAngle.pitchTolerance * 2)))
-          let rollProgress = rollValid ? 1.0 : max(0, 1.0 - (rollError / (currentAngle.rollTolerance * 2)))
+          let rollProgress =
+            rollValid ? 1.0 : max(0, 1.0 - (rollError / (currentAngle.rollTolerance * 2)))
           let combinedProgress = min(pitchProgress, rollProgress)
-          orientationStatus = combinedProgress < 0.3 ? .invalid : .adjusting(progress: combinedProgress)
+          orientationStatus =
+            combinedProgress < 0.3 ? .invalid : .adjusting(progress: combinedProgress)
         }
-        
+
         if validationLogCount % 30 == 1 {
-          print("   📱 Device pitch: \(String(format: "%.1f", devicePitch))° (target: \(String(format: "%.1f", currentAngle.targetPitch))°)")
+          print(
+            "   📱 Device pitch: \(String(format: "%.1f", devicePitch))° (target: \(String(format: "%.1f", currentAngle.targetPitch))°)"
+          )
           if !rollValid {
-            print("   ⚠️  Phone not upside down! Roll: \(String(format: "%.1f", deviceRoll))° (needs ±180°)")
+            print(
+              "   ⚠️  Phone not upside down! Roll: \(String(format: "%.1f", deviceRoll))° (needs ±180°)"
+            )
           }
         }
-        
+
         let partialValidation = PoseValidation(
           orientationValidation: OrientationValidation(
             status: orientationStatus,
@@ -471,14 +484,15 @@ class CaptureViewModel: ObservableObject {
 
     // İlk 3 açıda (frontFace, rightProfile, leftProfile) yüz ekranda olmalı
     // Son 2 açıda (vertex, donorArea) yüz ekrandan çıkabilir
-    let requiresFaceOnScreen = currentAngle == .frontFace || currentAngle == .rightProfile || currentAngle == .leftProfile
-    
+    let requiresFaceOnScreen =
+      currentAngle == .frontFace || currentAngle == .rightProfile || currentAngle == .leftProfile
+
     let detectionStatus: ValidationStatus
     if requiresFaceOnScreen {
       // İlk 3 açı: Yüz merkezde olmalı
       let maxCenterDistance: CGFloat = currentAngle == .frontFace ? 0.5 : 0.7  // frontFace daha strict
       let isCentered = centerDistance <= maxCenterDistance
-      
+
       if !isCentered {
         let centerProgress = max(0, 1.0 - Double(centerDistance / maxCenterDistance))
         detectionStatus = centerProgress < 0.3 ? .invalid : .adjusting(progress: centerProgress)
@@ -616,10 +630,10 @@ class CaptureViewModel: ObservableObject {
     }
 
     // İlk 3 senaryo için daha hızlı countdown (2-1), son 2 için normal (3-2-1)
-    let isFastScenario = session.currentAngle == .frontFace || 
-                         session.currentAngle == .rightProfile || 
-                         session.currentAngle == .leftProfile
-    
+    let isFastScenario =
+      session.currentAngle == .frontFace || session.currentAngle == .rightProfile
+      || session.currentAngle == .leftProfile
+
     let countdownStart = isFastScenario ? 2 : 3
     countdownValue = countdownStart
     print("⏱️ Countdown: \(countdownValue) (fast mode: \(isFastScenario))")
@@ -651,11 +665,11 @@ class CaptureViewModel: ObservableObject {
         // No extra haptic here - countdown already provides haptic feedback
 
         // İlk 3 senaryo için daha hızlı countdown interval
-        let isFastScenario = self.session.currentAngle == .frontFace || 
-                             self.session.currentAngle == .rightProfile || 
-                             self.session.currentAngle == .leftProfile
+        let isFastScenario =
+          self.session.currentAngle == .frontFace || self.session.currentAngle == .rightProfile
+          || self.session.currentAngle == .leftProfile
         let sleepIterations = isFastScenario ? 7 : 10  // 0.7s vs 1.0s per count
-        
+
         // Sleep in smaller increments to check cancellation more frequently
         for _ in 0..<sleepIterations {
           // Check cancellation and validation every 100ms
@@ -768,35 +782,36 @@ class CaptureViewModel: ObservableObject {
     isCountingDown = false
 
     // Track if we're using ARKit (for error recovery)
-    let wasUsingARKitBeforeCapture = faceTrackingService.isSupported && faceTrackingService.isTracking
-    
+    let wasUsingARKitBeforeCapture =
+      faceTrackingService.isSupported && faceTrackingService.isTracking
+
     do {
       var image: UIImage
-      
+
       // HYBRID CAPTURE STRATEGY:
       // iOS 16+ with ARKit → captureHighResolutionFrame (BEST: 0 latency, 0 race conditions)
       // iOS 15- or no ARKit → Traditional camera capture (fallback)
-      
+
       if #available(iOS 16.0, *), faceTrackingService.isSupported, faceTrackingService.isTracking {
         // ✅ SOLUTION 1: ARKit High-Resolution Capture (iOS 16+)
         // Per Apple WWDC 2022: Best approach for still image capture from ARKit
         print("📸 [Hybrid] Using ARKit high-resolution capture (iOS 16+)")
         print("   ✅ Benefits: 0ms warmup, 0 race conditions, highest quality")
-        
+
         let captureStartTime = Date()
         image = try await faceTrackingService.captureHighResolutionPhoto()
         let totalLatency = Date().timeIntervalSince(captureStartTime)
-        
+
         print("✅ [Hybrid] ARKit capture complete in \(String(format: "%.3f", totalLatency))s")
         print("   📊 vs Traditional: ~0.6s faster, 100% more reliable")
-        
+
       } else {
         // ⚠️ FALLBACK: Traditional camera capture (iOS 15- or no ARKit)
         print("📸 [Hybrid] Using traditional camera capture (fallback)")
         print("   ℹ️ Reason: iOS < 16 or ARKit not available")
-        
+
         let captureStartTime = Date()
-        
+
         // If ARKit is running, temporarily pause it and start camera session
         if wasUsingARKitBeforeCapture {
           print("⏸️ Pausing ARKit to capture photo...")
@@ -818,7 +833,7 @@ class CaptureViewModel: ObservableObject {
               // Wait a bit for setup to complete
               try await Task.sleep(nanoseconds: 300_000_000)  // 0.3 seconds
             }
-            
+
             print("📸 Starting camera session for capture...")
             cameraService.startSession()
 
@@ -828,7 +843,7 @@ class CaptureViewModel: ObservableObject {
             print("✅ Camera warmed up and ready")
           }
         }
-        
+
         // Additional stabilization delay for sharpest image
         // This ensures focus/exposure have settled
         try await Task.sleep(nanoseconds: 100_000_000)  // 0.1 second final stabilization
@@ -836,7 +851,7 @@ class CaptureViewModel: ObservableObject {
 
         print("📸 Calling cameraService.capturePhoto() for \(session.currentAngle.title)...")
         image = try await cameraService.capturePhoto(forAngle: session.currentAngle)
-        
+
         let totalLatency = Date().timeIntervalSince(captureStartTime)
         print("✅ [Hybrid] Traditional capture complete in \(String(format: "%.3f", totalLatency))s")
 
@@ -849,9 +864,9 @@ class CaptureViewModel: ObservableObject {
           faceTrackingService.startTracking()
         }
       }
-      
+
       print("✅ Photo captured successfully! Image size: \(image.size)")
-      
+
       // Log capture method for analytics
       if #available(iOS 16.0, *), faceTrackingService.isSupported {
         print("📊 [Analytics] Capture method: ARKit high-resolution (iOS 16+)")
@@ -894,15 +909,15 @@ class CaptureViewModel: ObservableObject {
       print(
         "✅ Photo added to session. Total photos: \(session.capturedPhotos.count)/\(CaptureAngle.allCases.count)"
       )
-      
+
       // Note: Session auto-save is handled by Combine observer on session.$capturedPhotos
 
       // İlk 3 senaryo için daha hızlı success flash
-      let isFastScenario = session.currentAngle == .frontFace || 
-                           session.currentAngle == .rightProfile || 
-                           session.currentAngle == .leftProfile
+      let isFastScenario =
+        session.currentAngle == .frontFace || session.currentAngle == .rightProfile
+        || session.currentAngle == .leftProfile
       let successDuration: UInt64 = isFastScenario ? 150_000_000 : 200_000_000  // 0.15s vs 0.2s
-      
+
       showSuccess = true
       try await Task.sleep(nanoseconds: successDuration)
       showSuccess = false
@@ -957,10 +972,11 @@ class CaptureViewModel: ObservableObject {
     currentValidation = nil
     validationStartTime = nil
     countdownValue = 3
-    
+
     // Set default flash mode for this angle
     cameraService.flashMode = FlashMode.defaultMode(for: session.currentAngle)
-    print("💡 Flash mode set to \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)")
+    print(
+      "💡 Flash mode set to \(cameraService.flashMode.rawValue) for \(session.currentAngle.title)")
   }
 
   func retakeCurrentAngle() {
@@ -976,7 +992,7 @@ class CaptureViewModel: ObservableObject {
     print("🔄 Retaking angle: \(angle.title)")
     session.retakeAngle(angle)
     resetValidationState()
-    
+
     // Note: Session auto-save is handled by Combine observer on session.$capturedPhotos
 
     // Restart capture services if not already running
@@ -993,7 +1009,7 @@ class CaptureViewModel: ObservableObject {
   func resetSession() {
     session.reset()
     resetValidationState()
-    
+
     // Clear auto-saved session when resetting
     sessionPersistenceService.clearSession()
   }
@@ -1027,7 +1043,7 @@ class CaptureViewModel: ObservableObject {
     session.currentAngle = previousAngle
     resetValidationState()
   }
-  
+
   func goToAngle(_ angle: CaptureAngle) {
     session.currentAngle = angle
     resetValidationState()

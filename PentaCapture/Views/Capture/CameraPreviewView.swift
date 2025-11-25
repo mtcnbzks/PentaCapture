@@ -8,8 +8,6 @@
 internal import AVFoundation
 import SwiftUI
 
-/// UIViewRepresentable wrapper for AVCaptureVideoPreviewLayer
-/// Used as fallback when ARKit face tracking is not available
 struct CameraPreviewView: UIViewRepresentable {
   let cameraService: CameraService
 
@@ -21,18 +19,10 @@ struct CameraPreviewView: UIViewRepresentable {
     return view
   }
 
-  func updateUIView(_ uiView: PreviewView, context: Context) {
-    // No updates needed
-  }
+  func updateUIView(_ uiView: PreviewView, context: Context) {}
 
-  /// Custom UIView that hosts the preview layer
-  class PreviewView: UIView {
-    override class var layerClass: AnyClass {
-      AVCaptureVideoPreviewLayer.self
-    }
-
-    var videoPreviewLayer: AVCaptureVideoPreviewLayer {
-      layer as! AVCaptureVideoPreviewLayer
-    }
+  final class PreviewView: UIView {
+    override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+    var videoPreviewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
   }
 }

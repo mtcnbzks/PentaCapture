@@ -199,7 +199,6 @@ struct HeatMapSummary: View {
   }
 }
 
-/// Summary item component
 struct SummaryItem: View {
   let icon: String
   let value: String
@@ -208,37 +207,23 @@ struct SummaryItem: View {
   var body: some View {
     VStack(spacing: 4) {
       HStack(spacing: 6) {
-        Image(systemName: icon)
-          .font(.caption)
-          .foregroundColor(.blue)
-
-        Text(value)
-          .font(.subheadline)
-          .fontWeight(.bold)
-          .foregroundColor(.white)
+        Image(systemName: icon).font(.caption).foregroundColor(.blue)
+        Text(value).font(.subheadline).fontWeight(.bold).foregroundColor(.white)
       }
-
-      Text(label)
-        .font(.caption2)
-        .foregroundColor(.white.opacity(0.6))
+      Text(label).font(.caption2).foregroundColor(.white.opacity(0.6))
     }
     .frame(maxWidth: .infinity)
   }
 }
 
-/// Legend item
 struct LegendItem: View {
   let color: Color
   let label: String
 
   var body: some View {
     HStack(spacing: 4) {
-      Circle()
-        .fill(color)
-        .frame(width: 8, height: 8)
-
-      Text(label)
-        .foregroundColor(.white.opacity(0.7))
+      Circle().fill(color).frame(width: 8, height: 8)
+      Text(label).foregroundColor(.white.opacity(0.7))
     }
   }
 }

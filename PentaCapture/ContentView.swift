@@ -29,7 +29,7 @@ struct ContentView: View {
           colors: [
             Color(red: 0.1, green: 0.1, blue: 0.15),
             Color(red: 0.15, green: 0.1, blue: 0.2),
-            Color(red: 0.2, green: 0.1, blue: 0.25)
+            Color(red: 0.2, green: 0.1, blue: 0.25),
           ],
           startPoint: .topLeading,
           endPoint: .bottomTrailing
@@ -96,15 +96,15 @@ struct ContentView: View {
                     showingCapture = true
                   }
                 },
-              onStartNew: {
-                sessionPersistenceService.clearSession()
-                if !hasCompletedOnboarding {
-                  shouldStartCaptureAfterOnboarding = true
-                  showingOnboarding = true
-                } else {
-                  showingCapture = true
+                onStartNew: {
+                  sessionPersistenceService.clearSession()
+                  if !hasCompletedOnboarding {
+                    shouldStartCaptureAfterOnboarding = true
+                    showingOnboarding = true
+                  } else {
+                    showingCapture = true
+                  }
                 }
-              }
               )
               .padding(.horizontal, 24)
               .padding(.bottom, 36)
@@ -250,10 +250,12 @@ struct ContentView: View {
     .onAppear {
       // Track app opens
       appOpenCount += 1
-      
+
       // Log saved session info
       if let metadata = sessionPersistenceService.savedSessionMetadata {
-        print("📱 Found saved session: \(metadata.capturedCount)/\(metadata.totalCount) photos, last saved \(SessionPersistenceService.formatTimeSince(metadata.lastSavedTime))")
+        print(
+          "📱 Found saved session: \(metadata.capturedCount)/\(metadata.totalCount) photos, last saved \(SessionPersistenceService.formatTimeSince(metadata.lastSavedTime))"
+        )
       }
 
       // Smart onboarding logic
@@ -282,7 +284,9 @@ struct ContentView: View {
       Button("İptal", role: .cancel) {}
     } message: {
       if let metadata = sessionPersistenceService.savedSessionMetadata {
-        Text("Yarım kalan çekimin var (\(metadata.capturedCount)/\(metadata.totalCount) fotoğraf). Kaldığın yerden devam etmek ister misin?")
+        Text(
+          "Yarım kalan çekimin var (\(metadata.capturedCount)/\(metadata.totalCount) fotoğraf). Kaldığın yerden devam etmek ister misin?"
+        )
       }
     }
     .preferredColorScheme(.dark)
@@ -499,7 +503,9 @@ struct SettingsView: View {
           } header: {
             Text("Session Auto-Save")
           } footer: {
-            Text("Yarım kalan çekimler otomatik olarak kaydedilir ve uygulama açıldığında devam edebilirsin.")
+            Text(
+              "Yarım kalan çekimler otomatik olarak kaydedilir ve uygulama açıldığında devam edebilirsin."
+            )
           }
           .listRowBackground(Color.white.opacity(0.08))
 
@@ -540,7 +546,7 @@ struct SettingsView: View {
       }
     }
   }
-  
+
   private func formatDate(_ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.dateStyle = .short
@@ -548,6 +554,17 @@ struct SettingsView: View {
     formatter.locale = Locale(identifier: "tr_TR")
     return formatter.string(from: date)
   }
+}
+
+// MARK: - Date Formatter Extension
+extension DateFormatter {
+  fileprivate static let turkishShort: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .short
+    formatter.timeStyle = .short
+    formatter.locale = Locale(identifier: "tr_TR")
+    return formatter
+  }()
 }
 
 // MARK: - Feature Row
@@ -561,11 +578,9 @@ struct FeatureRow: View {
         .font(.system(size: 16, weight: .medium))
         .foregroundColor(.white.opacity(0.8))
         .frame(width: 24)
-
       Text(text)
         .font(.system(size: 15, weight: .regular))
         .foregroundColor(.white.opacity(0.7))
-
       Spacer()
     }
   }

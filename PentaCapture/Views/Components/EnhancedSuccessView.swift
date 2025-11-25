@@ -5,21 +5,18 @@
 //  Created for Smile Hair Clinic Hackathon
 //
 
-import Foundation
 import SwiftUI
 
-/// Compact success view with modern design
 struct CompactSuccessView: View {
   @State private var scale: CGFloat = 0.5
   @State private var glowScale: CGFloat = 0.8
 
   var body: some View {
     ZStack {
-      // Outer glow ring
       Circle()
         .fill(
           RadialGradient(
-            colors: [Color.green.opacity(0.4), Color.clear],
+            colors: [Color.green.opacity(0.4), .clear],
             center: .center,
             startRadius: 30,
             endRadius: 60
@@ -27,23 +24,18 @@ struct CompactSuccessView: View {
         )
         .frame(width: 120, height: 120)
         .scaleEffect(glowScale)
-      
-      // Background circle with glassmorphism
+
       Circle()
         .fill(Color.black.opacity(0.3))
-        .background(
-          Circle()
-            .fill(.ultraThinMaterial)
-        )
+        .background(Circle().fill(.ultraThinMaterial))
         .frame(width: 80, height: 80)
         .shadow(color: .green.opacity(0.6), radius: 15)
-      
-      // Checkmark
+
       Image(systemName: "checkmark.circle.fill")
         .font(.system(size: 60, weight: .bold))
         .foregroundStyle(
           LinearGradient(
-            colors: [Color.green, Color.green.opacity(0.8)],
+            colors: [.green, .green.opacity(0.8)],
             startPoint: .top,
             endPoint: .bottom
           )
